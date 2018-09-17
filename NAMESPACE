@@ -1,0 +1,43 @@
+
+
+import(nleqslv)
+import(ggplot2)
+import(foreach)
+import(iterators)
+import(parallel)
+import(doParallel)
+import(datasets)
+import(graphics)
+import(grDevices)
+import(methods)
+import(stats)
+import(utils)
+
+export(check,
+       compmerge.list,
+       design.MSPRT,
+       effective.N,
+       error.summary,
+       find.alt,
+       find.samplesize,
+       find.thresold.ber,
+       find.umpbt.ber,
+       find.umpbt.norm,
+       find.umpbt.t,
+       implement.MSPRT,
+       LR.ber,
+       LR.norm,
+       LR.t,
+       obj.func.ber,
+       OC.MSPRT,
+       overshoot.ber,
+       overshoot.norm,
+       overshoot.t,
+       ovr.repl.ber,
+       ovr.repl.norm,
+       ovr.repl.t,
+       point.umpbt.ber,
+       type2.error.ber,
+       type2.error.norm,
+       type2.error.t,
+       ump.match.ber)
