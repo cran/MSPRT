@@ -2,89 +2,88 @@
 \alias{find.samplesize}
 %- Also NEED an '\alias' for EACH other topic documented here.
 \title{
-Sample size required to achieve a higher significance in a fixed design
+Sample size required to achieve a higher significance for one-sample tests in a fixed design
 }
 \description{
-This function finds the sample size that is required when we decrease the level of significance of a test while still maintaining a desired power at a point alternative. The sample size can be obtained in case of the test for proportion, Z-test and T-test.
+This function finds the sample size that is required to maintain a desired power at a point alternative when we decrease the level of significance of a fixed design one-sample test. This can be calculated in one-sample proportion tests, and one-sample Z & T-tests.
 }
 \usage{
 find.samplesize(test.type, N, lower.signif = 0.05, higher.signif = 0.005,
-                null.val, side = "right", pow = 0.8, alt, sigma0 = 1,
-                n.seq, plot.it = T)
+                null, side = "right", pow = 0.8, alt, sigma0 = 1,
+                n.seq, verbose=T, plot.it = T)
 }
-
+%- maybe also 'usage' for other objects documented here.
 \arguments{
   \item{test.type}{
-a character; determines the type of test;
+a character; denotes the type of test;
 
-             ``\code{prop.test}'' in case of a test for binomial proportion;
+             ``\code{oneProp}'' for a one-sample proportion tests.
              
-             ``\code{z.test}'' in case of a Z-test;
+             ``\code{oneZ}'' for a one-sample Z-tests.
              
-             ``\code{t.test}'' in case of a T-test.
+             ``\code{oneT}'' for a one-sample T-tests.
 }
   \item{N}{
-a numeric; sample size used at the lower level of significance in a fixed design
+a positive numeric (integer); \strong{required only in one-sample tests}; number of samples on which the fixed design one-sample test is based on.
 }
   \item{lower.signif}{
-a numeric in \code{(0,1)}; denotes the lower significance level
+a numeric in \code{(0,1)}; denotes the lower level of significance.
 
-\strong{Default} is \code{0.05}.
+\strong{Default:} \code{0.05}.
 }
   \item{higher.signif}{
-a numeric in \code{(0,1)}; denotes the higher significance level
+a numeric in \code{(0,1)}; denotes the higher level of significance.
 
-\strong{Default} is \code{0.005}.
+\strong{Default:} \code{0.005}.
 }
-  \item{null.val}{
-a numeric; 
+  \item{null}{
+a numeric; denotes the hypothesized value of the parameter under the null hypothesis.
 
-The hypothesized value of the parameter under the null hypothesis.
+The hypothesized parameters are proportion in one-sample proportion tests, and population mean in one-sample Z & T-tests.
 
-The hypothesized parameters are proportion in case of testing a binomial proportion, and  population mean in case of Z and T tests.
-
-\strong{Default:} 0.5 in case of the test for binomial proportion, and 0 for Z and T-tests.
+\strong{Default:} 0.5 in one-sample proportion tests, and 0 in one-sample Z and T-tests.
 }
   \item{side}{
-a character;
+a character; direction of the alternative hypothesis H1.
 
-direction of the alternative hypothesis H1; has to be one of \code{"right"} or \code{"left"}.
+Has to be one of \code{"right"} or \code{"left"}.
 
-\strong{Default} is \code{"right"}.
+\strong{Default:} \code{"right"}.
 }
   \item{pow}{
-a numeric in \code{(0,1)}; desired level of power at the point alternative
+a numeric in \code{(0,1)}; desired level of power at the point alternative \code{alt}.
 
-\strong{Default} is 0.8, means \eqn{80} percent power.
+\strong{Default:} 0.8. This means \eqn{80} percent power.
 }
   \item{alt}{
-missing or a numeric; a value of the point alternative where we want to maintain the power;
+missing or a numeric; value of the point alternative where we want to maintain the power \code{pow}.
 
-\strong{Default:} the fixed design alternative at the \code{lower.signif} using \code{N} samples.
+\strong{Default:} the `fixed design alternative' at the \code{lower.signif} using \code{N} samples.
 }
   \item{sigma0}{
-a positive numeric;
+a positive numeric; \strong{required only in one-sample Z-tests.} known population standard deviation.
 
-Specifies the known standard deviation (sd) in a Z-test;
-
-Only need to be specified in case of a Z-test;
-
-\strong{Default} is 1.
+\strong{Default:} 1.
 }
   \item{n.seq}{
-missing or a numeric vector; final value of the sample size is searched over this vector.
+missing or a numeric vector; the final value of increased sample size is searched over this vector.
 
-\strong{Default} is \code{N:(4*N)}.
+\strong{Default:} \code{N:(4*N)}.
+}
+  \item{verbose}{
+logical; if \code{TRUE}, returns a message of the achieved results; otherwise it doesn't.
+
+\strong{Default:} \code{TRUE}.
 }
   \item{plot.it}{
-a logical; if TRUE, returns a plot. Otherwise not.
+a logical; if \code{TRUE}, returns a plot; otherwise it doesn't.
 
-\strong{Default} is TRUE.
+\strong{Default:} \code{TRUE}.
 }
 }
 
 \value{
-Returns a numeric. In a fixed design, this is the sample size that we require to achieve the \code{higher.signif} while still mainting at least \code{pow} amount of power at the \code{alt}.
+Returns a numeric. In a fixed design for the specified one-sample test, this is the sample size that we require to achieve \code{higher.signif} while still mainting at least \code{pow} amount of power at \code{alt}.
 }
 \references{
 Main article and supplemental file of MSPRT
@@ -94,17 +93,23 @@ Sandipan Pramanik, Valen E. Johnson and Anirban Bhattacharya
 }
 
 \examples{
-find.samplesize(test.type = "prop.test", N = 30, null.val = .2)
+find.samplesize(test.type = "oneProp", N = 30, null = .2)
 
 # In this case, the fixed design alternative at 0.05 is 0.4263. As it seems,
 # we need to increase the sample size to 51 to achieve the higher significance
 # of 0.005 while still maintaining at least 80% power at 0.4263.
 
 
-find.samplesize(test.type = "prop.test", N = 30, null.val = .2, side = "left")
+find.samplesize(test.type = "oneProp", N = 30, null = .2, side = "left")
 
 # In this case, the fixed design alternative at 0.05 is 0.0516. For testing
 # against the left sided alternative, we need to increase the sample size to
 # 66 to achieve the higher significance of 0.005 while still maintaining at
 # least 80% power at 0.0516.
+
+find.samplesize(test.type = "oneZ", N = 30)
+find.samplesize(test.type = "oneZ", N = 30, side = "left")
+
+find.samplesize(test.type = "oneT", N = 30)
+find.samplesize(test.type = "oneT", N = 30, side = "left")
 }

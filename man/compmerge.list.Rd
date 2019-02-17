@@ -5,7 +5,7 @@
 Merging two lists componentwise
 }
 \description{
-Suppose two lists have same number of components. This function creates a new list by merging both of them componentwise.
+Suppose two lists have same number of components. This function creates a new list by merging (or concatenating) them componentwise.
 }
 \usage{
 compmerge.list(l1, l2)
@@ -14,6 +14,10 @@ compmerge.list(l1, l2)
 \arguments{
   \item{l1}{a list}
   \item{l2}{a list}
+}
+
+\details{
+\code{l1} and \code{l2} need to have same number of components.
 }
 
 \value{
