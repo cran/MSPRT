@@ -40,25 +40,19 @@ Has to be one of \code{"right"} or \code{"left"}.
 \strong{Default:} \code{"right"}.
 }
   \item{batch.seq}{
-a numeric vector; \strong{required only in one-sample tests.} An increasing sequence of values until \code{N.max}. Denotes the sequence of sample sizes where data is observed sequentially.
+a numeric vector; \strong{required only in one-sample tests.} Sizes of sequentially observed batches in a group sequential design.
 
-Last element should be equal to \code{N.max}.
-
-\strong{Default:} In case of one-sample binomial proportion test and one-sample Z-test, this is \code{1:N.max}. The same for one-sample T-test is \code{2:N.max}.
+\strong{Required only if the design is group sequential, that is when data are observed in batches. Otherwise, only need to provide \code{N.max}.}
 }
   \item{batch1.seq}{
-a numeric vector; \strong{required only in two-sample tests.} An increasing sequence of values until \code{N1.max}. Denotes the sequence of sample sizes where data is observed sequentially from Group-1.
+a numeric vector; \strong{required only in two-sample tests.} Sizes of sequentially observed batches from Group-1 in a group sequential design.
 
-Last element should equal be to \code{N1.max}.
-
-\strong{Default:} In case of two-sample Z-test, this is \code{1:N1.max}. The same for two-sample T-test is \code{2:N1.max}.
+\strong{Required only if the design is group sequential, that is when data from Group-1 are observed in batches. Otherwise, only need to provide \code{N1.max}.}
 }
   \item{batch2.seq}{
-a numeric vector; \strong{required only in two-sample tests.} An increasing sequence of values until \code{N2.max}. Denotes the sequence of sample sizes where data is observed sequentially from Group-2.
+a numeric vector; \strong{required only in two-sample tests.} Sizes of sequentially observed batches from Group-2 in a group sequential design.
 
-Last element should equal be to \code{N2.max}.
-
-\strong{Default:} In case of two-sample Z-test, this is \code{1:N2.max}. The same for two-sample T-test is \code{2:N2.max}.
+\strong{Required only if the design is group sequential, that is when data from Group-2 are observed in batches. Otherwise, only need to provide \code{N2.max}.}
 }
   \item{type1}{
 a numeric in \code{(0,1)}; the probability at which we want to control the Type 1 error of the MSPRT.
@@ -86,12 +80,18 @@ a positive numeric; \strong{required only in one & two-sample Z-tests.} Known po
 }
   \item{N.max}{
 a positive numeric (integer); \strong{required only in one-sample tests.} Maximum number of samples that we can afford in the one-sample test.
+
+In a group sequential design, this should be equal to \code{sum(batch.seq)}. So in that case, it's enough to provide only \code{batch.seq} and not \code{N.max}.
 }
   \item{N1.max}{
 a positive numeric (integer); \strong{required only in two-sample tests.} Maximum number of samples from Group-1 that we can afford in the two-sample test.
+
+In a group sequential design, this should be equal to \code{sum(batch1.seq)}. So in that case, it's enough to provide only \code{batch1.seq} and not \code{N1.max}.
 }
   \item{N2.max}{
 a positive numeric (integer); \strong{required only in two-sample tests.} Maximum number of samples from Group-2 that we can afford in the two-sample test.
+
+In a group sequential design, this should be equal to \code{sum(batch2.seq)}. So in that case, it's enough to provide only \code{batch2.seq} and not \code{N2.max}.
 }
   \item{alt.comp}{
 missing, \code{FALSE} or \code{TRUE}, or a numeric;
@@ -198,9 +198,9 @@ Sandipan Pramanik, Valen E. Johnson and Anirban Bhattacharya
 
 
 # can observe data at every fifth sample sequentially. Max available
-# sample size is 30
+# sample size is 30. So there are 6 batches each of size 5.
 # design.MSPRT(test.type="oneProp", null = 0.2, N.max = 30,
-#              batch.seq = seq(5,30, by = 5))
+#              batch.seq = rep(5,6))
                
 
                
@@ -213,9 +213,9 @@ Sandipan Pramanik, Valen E. Johnson and Anirban Bhattacharya
 
 
 # can observe data at every fifth sample sequentially. Max available
-# sample size is 30
+# sample size is 30. So there are 6 batches each of size 5.
 # design.MSPRT(test.type="oneZ", null = 3, sigma0 = 1.5,
-#              N.max = 30, batch.seq = seq(5,30, by = 5))
+#              N.max = 30, batch.seq = rep(5,6))
                
 
 
@@ -227,8 +227,8 @@ Sandipan Pramanik, Valen E. Johnson and Anirban Bhattacharya
 
 
 # can observe data at every fifth sample sequentially. Max available
-# sample size is 30
-# design.MSPRT(test.type="oneT", N.max = 30, batch.seq = seq(5,30, by = 5))
+# sample size is 30. So there are 6 batches each of size 5.
+# design.MSPRT(test.type="oneT", N.max = 30, batch.seq = rep(5,6))
 
 
                
@@ -240,9 +240,10 @@ Sandipan Pramanik, Valen E. Johnson and Anirban Bhattacharya
 
 
 # can observe data at every fifth sample for each group sequentially.
-# Max available sample size is 30 for both groups
+# Max available sample size is 30 for both groups. So there are 6 batches
+# each of size 5 for each group.
 # design.MSPRT(test.type="twoZ", sigma0 = 1.5,
-#              batch1.seq = seq(5,30, by = 5), batch2.seq = seq(5,30, by = 5),
+#              batch1.seq = rep(5,6), batch2.seq = rep(5,6),
 #              N1.max = 30, N2.max = 30)
                
 
@@ -255,7 +256,8 @@ Sandipan Pramanik, Valen E. Johnson and Anirban Bhattacharya
 
 
 # can observe data at every fifth sample for each group sequentially.
-# Max available sample size is 30 for both groups
+# Max available sample size is 30 for both groups. So there are 6 batches
+# each of size 5 for each group.
 # design.MSPRT(test.type="twoT", N1.max = 30, N2.max = 30,
-#              batch1.seq = seq(5,30, by = 5), batch2.seq = seq(5,30, by = 5))
+#              batch1.seq = rep(5,6), batch2.seq = rep(5,6))
 }

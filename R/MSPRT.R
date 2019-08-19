@@ -1,6 +1,5 @@
 
 
-
 if(getRversion() >= "2.15.1"){
   utils::globalVariables("k")
 }
@@ -336,11 +335,15 @@ umpbt.twoT = function( side = "right", type1 = 0.005, n1, n2,
     s = sqrt((((n1.obs-1)*var(obs1))+((n2.obs-1)*var(obs2)))/(n1.obs+ n2.obs -2))
   }
   
-  t.alpha = qt( type1, df = (n1 + n2 -2), lower.tail = F)
-  gamma.thresh = (((t.alpha^2)/(n1 + n2 -2)) +1)^((n1+n2)/2)
-  gamma.star = gamma.thresh^(2/(n1 + n2 -1)) -1
+  nu = n1 + n2 -2
+  t.alpha = qt( type1, df = nu, lower.tail = F)
+  # gamma.thresh = (((t.alpha^2)/(n1 + n2 -2)) +1)^((n1+n2)/2)
+  # gamma.star = gamma.thresh^(2/(n1 + n2 -1)) -1
   
-  alt = s*sqrt(((n1+n2)*gamma.star*(n1+n2-2))/(n1*n2))
+  # alt = s*sqrt(((n1+n2)*gamma.star*(n1+n2-2))/(n1*n2))
+  
+  gamma.star = ((((t.alpha^2)/nu) +1)^((n1 +n2)/(n1 +n2 -1))) -1
+  alt = s*sqrt(((n1+ n2)*gamma.star*nu)/(n1*n2))
   
   if(side=="right"){
     umpbt = alt
@@ -1377,16 +1380,22 @@ overshoot.twoT = function( side, error.type, batch1.seq, batch2.seq, type1, gen.
 error.summary = function( error.type, delta, root, count, inconclusive.vec, R, type1, type2){
   
   if(error.type=="type1"){
+    
     est = (count + sum(inconclusive.vec>=delta))/R
     
-    k.dec = abs(ceiling(log10(sqrt((type1*(1- type1))/R))))
-    est = floor(est*10^k.dec)/(10^k.dec)
+    k.dec=1
+    while(type1!=round(type1,k.dec)){
+      k.dec = k.dec+1
+    }
+    k.dec = k.dec+1
+    est = round(est, k.dec)
     
   }else if(error.type=="type2"){
+    
     est = (count + sum(inconclusive.vec<delta))/R
     
-    k.dec = abs(ceiling(log10(sqrt((type2*(1- type2))/R))))
-    est = floor(est*10^k.dec)/(10^k.dec)
+    k.dec = 4
+    est = round(est, k.dec)
   }
   
   return((est - root))
@@ -1419,11 +1428,7 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
 
   ## proptest
   if(test.type=="oneProp"){
-
-    # checking if N.max is provided
-    if(missing(N.max)==T){
-      return("Maximum budget on sample size is not provided")
-    }
+    
     
     # ignoring batch1.seq & batch2.seq
     if(missing(batch1.seq)==F) print("'batch1.seq' is ignored. Not required in a one-sample test.")
@@ -1437,9 +1442,19 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
     
     ## msg
     if(verbose==T){
-      print("-------------------------------------------------------------------------")
-      print("Designing the MSPRT in case of a one-sample binomial proportion test:")
-      print("-------------------------------------------------------------------------")
+      
+      if((missing(batch.seq)==F) && (sum(batch.seq!=1)>0)){
+        
+        print("-------------------------------------------------------------------------")
+        print("Designing the group sequential MSPRT in case of a one-sample proportion test:")
+        print("-------------------------------------------------------------------------")
+        
+      }else{
+        
+        print("-------------------------------------------------------------------------")
+        print("Designing the MSPRT in case of a one-sample proportion test:")
+        print("-------------------------------------------------------------------------")
+      }
     }
 
 
@@ -1460,7 +1475,48 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
         print(paste("Working with side = ",side," (user specified)", sep = ""))
       }
     }
-
+    
+    
+    #default batch sequence and N.max
+    if(missing(batch.seq)==T){
+      
+      if(missing(N.max)==T){
+        return("Error! Need to specify at least batch.seq (batch sizes) or N.max (Maximum available sample size)")
+      }else{
+        
+        batch.seq = 1:N.max
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N.max = ", N.max, sep = ""))
+          print(paste("             batch.seq = ", 1, ":N.max (default)", sep = ""))
+        }
+      }
+      
+    }else{
+      
+      if(missing(N.max)==T){
+        
+        N.max = sum(batch.seq)
+        ## msg
+        if(verbose==T){
+          print(paste("             N.max = ", N.max, sep = ""))
+          print("             batch.seq (user specified)")
+        }
+        
+      }else{
+        
+        if(sum(batch.seq)!=N.max) return("Error! Sum of batch sizes should add up to N.max")
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N.max = ", N.max, sep = ""))
+          print("             batch.seq (user specified)")
+        }
+      }
+      
+      batch.seq = cumsum(batch.seq)
+    }
 
     # type1
     if(missing(type1)==T){
@@ -1492,24 +1548,7 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
         print(paste("             type2 = ",type2," (user specified)", sep = ""))
       }
     }
-
-
-    # batch sequence
-    if(missing(batch.seq)==T){
-
-      batch.seq = 1:N.max
-
-      ## msg
-      if(verbose==T){
-        print(paste("             batch.seq = ",1,":N.max (default)", sep = ""))
-      }
-    }else{
-
-      ##msg
-      if(verbose==T){
-        print("             batch.seq (user specified)")
-      }
-    }
+    
 
     # setting default null
     if(missing(null)==T){
@@ -1532,7 +1571,13 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
     if(missing(repl)==T){
       repl = 2e+6
     }else{repl = repl}
-    k.dec = floor(log(sqrt(repl)))
+    # k.dec = floor(log(sqrt(repl)))
+    # k.dec=1
+    # while(type1!=round(type1,k.dec)){
+    #   k.dec = k.dec+1
+    # }
+    # k.dec = k.dec+1
+    
 
     # default number of cores
     if(missing(core.no)==T){
@@ -1613,182 +1658,24 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
     vec = sort(overshoot.summ$inconclusive.vec)
 
     vec.unique = unique(vec)
-
-    # setting default starting delta
-    delta.opt = ump.match.oneProp( side, type1, N.max, null)
-
-    if(sum(vec.unique>delta.opt)==0){
-
-      i.opt = length(vec.unique)
-    }else if(sum(vec.unique<delta.opt)==0){
-
-      i.opt = 1
+    err.seq = mapply(FUN = error.summary, delta=vec.unique, 
+                     MoreArgs = list(error.type = "type1", count= overshoot.summ$count, 
+                                     inconclusive.vec= vec, root=0, R= repl, 
+                                     type1 = type1))
+    if(sum(err.seq<=type1)==0){
+      
+      delta.opt = floor(vec.unique[length(vec.unique)]*100)/100 + 0.01
+      
+    }else if(sum(err.seq>type1)==0){
+      
+      delta.opt = floor(wald.low*100)/100 + 0.01
+      
     }else{
-      i.opt = min(which(vec.unique>=delta.opt))
+      
+      i.opt = min(which(err.seq<=type1))
+      delta.opt = delta.opt = floor(vec.unique[i.opt -1]*100)/100 + 0.01
     }
-
-    fnew = error.summary( error.type = "type1", delta= vec.unique[i.opt], root = type1, count= overshoot.summ$count,
-                          inconclusive.vec= vec, R= repl, type1 = type1)
-
-    if(fnew<=0){
-
-      if(i.opt==1){
-
-        delta.opt.t = (floor(wald.low*1000))/1000
-        delta.opt = (floor(delta.opt.t*100))/100
-        while((delta.opt - delta.opt.t)<=(10^-k.dec)){
-          delta.opt = delta.opt +.01
-        }
-
-      }else{
-
-        i.opt = i.opt - 1
-        while( (fnew<=0) && (i.opt>0)){
-
-          fnew = error.summary( error.type = "type1", delta= vec.unique[i.opt], root = type1,
-                                count= overshoot.summ$count, inconclusive.vec= vec,
-                                R= repl, type1 = type1)
-          i.opt = i.opt - 1
-        }
-
-        if( (fnew>0) && (i.opt>0) ){
-
-          i.opt = i.opt + 1
-
-          i.opt.u = i.opt
-          delta.opt.t.u = (floor(vec.unique[i.opt.u]*1000))/1000
-          delta.opt.u = (floor(delta.opt.t.u*100))/100
-          while((delta.opt.u - delta.opt.t.u)<=(10^-k.dec)){
-            delta.opt.u = delta.opt.u +.01
-          }
-
-          i.opt.l = i.opt -1
-          delta.opt.t.l = (floor(vec.unique[i.opt.l]*1000))/1000
-          delta.opt.l = (floor(delta.opt.t.l*100))/100
-          while((delta.opt.l - delta.opt.t.l)<=(10^-k.dec)){
-            delta.opt.l = delta.opt.l +.01
-          }
-
-          quant.prob = error.summary( error.type = "type1", delta= vec.unique[i.opt+1], root = 0,
-                                      count= overshoot.summ$count, inconclusive.vec= vec, R= repl, type1 = type1)
-          psi = ((type1 - quant.prob)*repl)/sum(vec==vec.unique[i.opt])
-          delta.opt = c(delta.opt.l, delta.opt.u)
-
-        }else if( (fnew<=0) && (i.opt==0) ){
-
-          delta.opt.t = (floor(wald.low*1000))/1000
-          delta.opt = (floor(delta.opt.t*100))/100
-          while((delta.opt - delta.opt.t)<=(10^-k.dec)){
-            delta.opt = delta.opt +.01
-          }
-
-        }else if( (fnew>0) && (i.opt==0) ){
-
-          i.opt = i.opt + 1
-
-          i.opt.u = i.opt
-          delta.opt.t.u = (floor(vec.unique[i.opt.u]*1000))/1000
-          delta.opt.u = (floor(delta.opt.t.u*100))/100
-          while((delta.opt.u - delta.opt.t.u)<=(10^-k.dec)){
-            delta.opt.u = delta.opt.u +.01
-          }
-
-          delta.opt.t.l = (floor(wald.low*1000))/1000
-          delta.opt.l = (floor(delta.opt.t.l*100))/100
-          while((delta.opt.l - delta.opt.t.l)<=(10^-k.dec)){
-            delta.opt.l = delta.opt.l +.01
-          }
-
-          quant.prob = error.summary( error.type = "type1", delta= vec.unique[i.opt+1], root = 0,
-                                      count= overshoot.summ$count, inconclusive.vec= vec, R= repl, type1 = type1)
-          psi = ((type1 - quant.prob)*repl)/sum(vec==vec.unique[i.opt])
-          delta.opt = c(delta.opt.l, delta.opt.u)
-
-        }
-      }
-    }else if(fnew>0){
-
-      if(i.opt==length(vec.unique)){
-
-        delta.opt.t = (floor(vec.unique[length(vec.unique)]*1000))/1000
-        delta.opt = (floor(delta.opt.t*100))/100
-        while((delta.opt - delta.opt.t)<=(10^-k.dec)){
-          delta.opt = delta.opt +.01
-        }
-
-      }else{
-
-        i.opt = i.opt + 1
-        while( (fnew>0) && (i.opt<(length(vec.unique) +1)) ){
-
-          fnew = error.summary( error.type = "type1", delta= vec.unique[i.opt], root = type1, count= overshoot.summ$count,
-                                inconclusive.vec= vec, R= repl, type1 = type1)
-          i.opt = i.opt + 1
-        }
-
-        if( (fnew<=0) && (i.opt<(length(vec.unique) +1)) ){
-
-          i.opt = i.opt -2
-
-          i.opt.u = i.opt
-          delta.opt.t.u = (floor(vec.unique[i.opt.u]*1000))/1000
-          delta.opt.u = (floor(delta.opt.t.u*100))/100
-          while((delta.opt.u - delta.opt.t.u)<=(10^-k.dec)){
-            delta.opt.u = delta.opt.u +.01
-          }
-
-          i.opt.l = i.opt -1
-          delta.opt.t.l = (floor(vec.unique[i.opt.l]*1000))/1000
-          delta.opt.l = (floor(delta.opt.t.l*100))/100
-          while((delta.opt.l - delta.opt.t.l)<=(10^-k.dec)){
-            delta.opt.l = delta.opt.l +.01
-          }
-
-          quant.prob = error.summary( error.type = "type1", delta= vec.unique[i.opt+1], root = 0,
-                                      count= overshoot.summ$count, inconclusive.vec= vec, R= repl, type1 = type1)
-          psi = ((type1 - quant.prob)*repl)/sum(vec==vec.unique[i.opt])
-          delta.opt = c(delta.opt.l, delta.opt.u)
-
-
-        }else if( (fnew>0) && (i.opt==(length(vec.unique) +1)) ){
-
-          delta.opt.t = (floor(vec.unique[length(vec.unique)]*1000))/1000
-          delta.opt = (floor(delta.opt.t*100))/100
-          while((delta.opt - delta.opt.t)<=(10^-k.dec)){
-            delta.opt = delta.opt +.01
-          }
-
-        }else if( (fnew<=0) && ( i.opt==(length(vec.unique) +1) ) ){
-
-          i.opt = i.opt -2
-
-          i.opt.u = i.opt
-          delta.opt.t.u = (floor(vec.unique[i.opt.u]*1000))/1000
-          delta.opt.u = (floor(delta.opt.t.u*100))/100
-          while((delta.opt.u - delta.opt.t.u)<=(10^-k.dec)){
-            delta.opt.u = delta.opt.u +.01
-          }
-
-          i.opt.l = i.opt -1
-          delta.opt.t.l = (floor(vec.unique[i.opt.l]*1000))/1000
-          delta.opt.l = (floor(delta.opt.t.l*100))/100
-          while((delta.opt.l - delta.opt.t.l)<=(10^-k.dec)){
-            delta.opt.l = delta.opt.l +.01
-          }
-
-          quant.prob = error.summary( error.type = "type1", delta= vec.unique[i.opt+1], root = 0,
-                                      count= overshoot.summ$count, inconclusive.vec= vec, R= repl)
-          psi = ((type1 - quant.prob)*repl)/sum(vec==vec.unique[i.opt], type1 = type1)
-          delta.opt = c(delta.opt.l, delta.opt.u)
-
-        }
-      }
-
-    }
-
-    if(length(delta.opt)>1){
-      delta.opt = delta.opt.u
-    }
+    
 
     ## msg
     if(verbose==T){
@@ -1806,12 +1693,11 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
       print("OC of the obtained MSPRT under the null is being calculated:")
     }
 
-    type1.est = error.summary( error.type = "type1", delta= delta.opt, root = 0, count= overshoot.summ$count,
-                               inconclusive.vec= overshoot.summ$inconclusive.vec, R= repl, type1 = type1)
-
-    var.n0 = var(overshoot.summ$n.vec)
-    k.dec.n0 = abs(ceiling(log10(sqrt(var.n0/repl))))
-    avg.n0 = floor(mean(overshoot.summ$n.vec)*10^k.dec.n0)/(10^k.dec.n0)
+    type1.est = error.summary( error.type = "type1", delta = delta.opt, root = 0,
+                               count= overshoot.summ$count, 
+                               inconclusive.vec = overshoot.summ$inconclusive.vec,
+                               R = repl, type1 = type1)
+    avg.n0 = floor(mean(overshoot.summ$n.vec)*100)/100
 
     out.null.opt = list("type1.est"= type1.est, "avg.n0"= avg.n0)
 
@@ -1861,8 +1747,8 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
 
 
       # actual type 2 error probability at umpbt and fixed design
-      alt.type2 = type2.error.oneProp( side = side, alt = alt.comp, null = null, 
-                                       n=N.max, type1 = type1, root = 0)
+      alt.type2 = round(type2.error.oneProp( side = side, alt = alt.comp, null = null, 
+                                             n=N.max, type1 = type1, root = 0), 4)
 
 
       # performance under the corresponding alternative
@@ -1904,12 +1790,10 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
 
       overshoot.summ = list("count" = sum(as.numeric(out[[1]])), "inconclusive.vec" = vec, "n.vec"=as.numeric(out[[3]]))
 
-      type2.est = error.summary( error.type = "type2", delta= delta.opt, root = 0, count= overshoot.summ$count,
-                                 inconclusive.vec= overshoot.summ$inconclusive.vec, R= repl, type2 = type2)
-
-      var.n1 = var(overshoot.summ$n.vec)
-      k.dec.n1 = abs(ceiling(log10(sqrt(var.n1/repl))))
-      avg.n1 = floor(mean(overshoot.summ$n.vec)*10^k.dec.n1)/(10^k.dec.n1)
+      type2.est = error.summary( error.type = "type2", delta = delta.opt, root = 0,
+                                 count= overshoot.summ$count, inconclusive.vec = overshoot.summ$inconclusive.vec,
+                                 R = repl, type2 = type2)
+      avg.n1 = floor(mean(overshoot.summ$n.vec)*100)/100
 
       out.alt.opt = list("type2.est"=type2.est, "avg.n1"=avg.n1)
 
@@ -1933,11 +1817,7 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
 
   ## z test
   if(test.type=="oneZ"){
-
-    # checking if N.max is provided
-    if(missing(N.max)==T){
-      return("Maximum budget on sample size is not provided")
-    }
+    
     
     # ignoring batch1.seq & batch2.seq
     if(missing(batch1.seq)==F) print("'batch1.seq' is ignored. Not required in a one-sample test.")
@@ -1948,12 +1828,21 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
     if(missing(N2.max)==F) print("'N2.max' is ignored. Not required in a one-sample test.")
     
     
-    
     ## msg
     if(verbose==T){
-      print("-------------------------------------------------------------------------")
-      print("Designing the MSPRT in case of a one-sample Z-test:")
-      print("-------------------------------------------------------------------------")
+      
+      if((missing(batch.seq)==F) && (sum(batch.seq!=1)>0)){
+        
+        print("-------------------------------------------------------------------------")
+        print("Designing the group sequential MSPRT in case of a one-sample Z-test:")
+        print("-------------------------------------------------------------------------")
+        
+      }else{
+        
+        print("-------------------------------------------------------------------------")
+        print("Designing the MSPRT in case of a one-sample Z-test:")
+        print("-------------------------------------------------------------------------")
+      }
     }
 
 
@@ -1974,7 +1863,48 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
         print(paste("Working with side = ",side," (user specified)", sep = ""))
       }
     }
-
+    
+    
+    #default batch sequence and N.max
+    if(missing(batch.seq)==T){
+      
+      if(missing(N.max)==T){
+        return("Error! Need to specify at least batch.seq (batch sizes) or N.max (Maximum available sample size)")
+      }else{
+        
+        batch.seq = 1:N.max
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N.max = ", N.max, sep = ""))
+          print(paste("             batch.seq = ", 1, ":N.max (default)", sep = ""))
+        }
+      }
+      
+    }else{
+      
+      if(missing(N.max)==T){
+        
+        N.max = sum(batch.seq)
+        ## msg
+        if(verbose==T){
+          print(paste("             N.max = ", N.max, sep = ""))
+          print("             batch.seq (user specified)")
+        }
+        
+      }else{
+        
+        if(sum(batch.seq)!=N.max) return("Error! Sum of batch sizes should add up to N.max")
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N.max = ", N.max, sep = ""))
+          print("             batch.seq (user specified)")
+        }
+      }
+      
+      batch.seq = cumsum(batch.seq)
+    }
 
     # type1
     if(missing(type1)==T){
@@ -2006,24 +1936,7 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
         print(paste("             type2 = ",type2," (user specified)", sep = ""))
       }
     }
-
-
-    # batch sequence
-    if(missing(batch.seq)==T){
-
-      batch.seq = 1:N.max
-
-      ## msg
-      if(verbose==T){
-        print(paste("             batch.seq = ",1,":N.max (default)", sep = ""))
-      }
-    }else{
-
-      ##msg
-      if(verbose==T){
-        print("             batch.seq (user specified)")
-      }
-    }
+    
 
     # setting default null
     if(missing(null)==T){
@@ -2064,7 +1977,12 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
     if(missing(repl)==T){
       repl = 1e+6
     }else{repl = repl}
-    k.dec = floor(log(sqrt(repl)))
+    # k.dec = floor(log(sqrt(repl)))
+    # k.dec=1
+    # while(type1!=round(type1,k.dec)){
+    #   k.dec = k.dec+1
+    # }
+    # k.dec = k.dec+1
 
     # default number of cores
     if(missing(core.no)==T){
@@ -2161,12 +2079,8 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
       print("OC of the obtained MSPRT under the null is being calculated:")
     }
 
-    k.dec.type1 = abs(ceiling(log10(sqrt((type1*(1- type1))/repl))))
-    type1.est = round( ((overshoot.summ$count + sum(overshoot.summ$inconclusive.vec>=delta.opt))/repl), (k.dec.type1 -1))
-
-    var.n0 = var(overshoot.summ$n.vec)
-    k.dec.n0 = abs(ceiling(log10(sqrt(var.n0/repl))))
-    avg.n0 = floor(mean(overshoot.summ$n.vec)*10^k.dec.n0)/(10^k.dec.n0)
+    type1.est = ((overshoot.summ$count + sum(overshoot.summ$inconclusive.vec>=delta.opt))/repl)
+    avg.n0 = floor(mean(overshoot.summ$n.vec)*100)/100
 
     out.null.opt = list("type1.est"= type1.est, "avg.n0"= avg.n0)
 
@@ -2215,8 +2129,8 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
 
 
       # actual type 2 error probability at umpbt and fixed design
-      alt.type2 = type2.error.oneZ( side = side, alt = alt.comp, null = null, sigma0 = sigma0,
-                                    n=N.max, type1 = type1, root = 0)
+      alt.type2 = round(type2.error.oneZ( side = side, alt = alt.comp, null = null, sigma0 = sigma0,
+                                          n=N.max, type1 = type1, root = 0), 4)
 
 
       # performance under the corresponding alternative
@@ -2258,12 +2172,12 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
 
       overshoot.summ = list("count" = sum(as.numeric(out[[1]])), "inconclusive.vec" = vec, "n.vec"=as.numeric(out[[3]]))
 
-      type2.est = error.summary( error.type = "type2", delta= delta.opt, root = 0, count= overshoot.summ$count,
-                                 inconclusive.vec= overshoot.summ$inconclusive.vec, R= repl, type2 = type2)
-
-      var.n1 = var(overshoot.summ$n.vec)
-      k.dec.n1 = abs(ceiling(log10(sqrt(var.n1/repl))))
-      avg.n1 = floor(mean(overshoot.summ$n.vec)*10^k.dec.n1)/(10^k.dec.n1)
+      type2.est = error.summary( error.type = "type2", delta= delta.opt, root = 0, 
+                                 count= overshoot.summ$count,
+                                 inconclusive.vec= overshoot.summ$inconclusive.vec, 
+                                 R= repl, type2 = type2)
+      
+      avg.n1 = floor(mean(overshoot.summ$n.vec)*100)/100
 
       out.alt.opt = list("type2.est"=type2.est, "avg.n1"=avg.n1)
 
@@ -2285,11 +2199,7 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
 
   ## t test
   if(test.type=="oneT"){
-
-    # checking if N.max is provided
-    if(missing(N.max)==T){
-      return("Maximum budget on sample size is not provided")
-    }
+    
     
     # ignoring batch1.seq & batch2.seq
     if(missing(batch1.seq)==F) print("'batch1.seq' is ignored. Not required in a one-sample test.")
@@ -2302,11 +2212,23 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
     # ignoring null
     if(missing(null)==F) print("'null' is ignored and is set at 0. This is required in one-sample T-test.")
     
+    
+    
     ## msg
     if(verbose==T){
-      print("-------------------------------------------------------------------------")
-      print("Designing the MSPRT in case of a one-sample T-test:")
-      print("-------------------------------------------------------------------------")
+      
+      if((missing(batch.seq)==F) && (sum(batch.seq[-1]!=1)>0)){
+        
+        print("-------------------------------------------------------------------------")
+        print("Designing the group sequential MSPRT in case of a one-sample T-test:")
+        print("-------------------------------------------------------------------------")
+        
+      }else{
+        
+        print("-------------------------------------------------------------------------")
+        print("Designing the MSPRT in case of a one-sample T-test:")
+        print("-------------------------------------------------------------------------")
+      }
     }
 
 
@@ -2327,8 +2249,52 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
         print(paste("Working with side = ",side," (user specified)", sep = ""))
       }
     }
-
-
+    
+    
+    #default batch sequence and N.max
+    if(missing(batch.seq)==T){
+      
+      if(missing(N.max)==T){
+        return("Error! Need to specify at least batch.seq (batch sizes) or N.max (Maximum available sample size)")
+      }else{
+        
+        batch.seq = 2:N.max
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N.max = ", N.max, sep = ""))
+          print(paste("             batch.seq = ", 2, ":N.max (default)", sep = ""))
+        }
+      }
+      
+    }else{
+      
+      if(batch.seq[1]<2) return("Error! First batch size should be at least 2")
+      
+      if(missing(N.max)==T){
+        
+        N.max = sum(batch.seq)
+        ## msg
+        if(verbose==T){
+          print(paste("             N.max = ", N.max, sep = ""))
+          print("             batch.seq (user specified)")
+        }
+        
+      }else{
+        
+        if(sum(batch.seq)!=N.max) return("Error! Sum of batch sizes should add up to N.max")
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N.max = ", N.max, sep = ""))
+          print("             batch.seq (user specified)")
+        }
+      }
+      
+      batch.seq = cumsum(batch.seq)
+    }
+    
+    
     # type1
     if(missing(type1)==T){
 
@@ -2359,30 +2325,7 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
         print(paste("             type2 = ",type2," (user specified)", sep = ""))
       }
     }
-
-
-    # batch sequence
-    if(missing(batch.seq)==T){
-
-      batch.seq = 2:N.max
-
-      ## msg
-      if(verbose==T){
-        print(paste("             batch.seq = ",2,":N.max (default)", sep = ""))
-      }
-    }else{
-
-      if(batch.seq[1]<2){
-        return("batch.seq[1]<2. Need at least 2 samples to compute sample standard deviation")
-      }else{
-
-        ##msg
-        if(verbose==T){
-          print("             batch.seq (user specified)")
-        }
-      }
-    }
-
+    
 
     # setting default null
     null = 0
@@ -2397,7 +2340,11 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
     if(missing(repl)==T){
       repl = 1e+6
     }else{repl = repl}
-    k.dec = floor(log(sqrt(repl)))
+    # k.dec=1
+    # while(type1!=round(type1,k.dec)){
+    #   k.dec = k.dec+1
+    # }
+    # k.dec = k.dec+1
 
     # default number of cores
     if(missing(core.no)==T){
@@ -2483,12 +2430,12 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
       print("OC of the obtained MSPRT under the null is being calculated:")
     }
 
-    type1.est = error.summary( error.type = "type1", delta= delta.opt, root = 0, count= overshoot.summ$count,
-                               inconclusive.vec= overshoot.summ$inconclusive.vec, R= repl, type1 = type1)
+    type1.est = error.summary( error.type = "type1", delta= delta.opt, root = 0, 
+                               count= overshoot.summ$count,
+                               inconclusive.vec= overshoot.summ$inconclusive.vec, 
+                               R= repl, type1 = type1)
 
-    var.n0 = var(overshoot.summ$n.vec)
-    k.dec.n0 = abs(ceiling(log10(sqrt(var.n0/repl))))
-    avg.n0 = floor(mean(overshoot.summ$n.vec)*10^k.dec.n0)/(10^k.dec.n0)
+    avg.n0 = floor(mean(overshoot.summ$n.vec)*100)/100
 
     out.null.opt = list("type1.est"= type1.est, "avg.n0"= avg.n0)
 
@@ -2536,8 +2483,8 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
 
 
       # actual type 2 error probability at umpbt and fixed design
-      alt.type2 = type2.error.oneT( side = side, alt = alt.comp, null = null, n=N.max,
-                                    type1 = type1, root = 0)
+      alt.type2 = round(type2.error.oneT( side = side, alt = alt.comp, null = null, n=N.max,
+                                          type1 = type1, root = 0), 4)
 
 
       # performance under the corresponding alternative
@@ -2581,12 +2528,12 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
 
       overshoot.summ = list("count" = sum(as.numeric(out[[1]])), "inconclusive.vec" = vec, "n.vec"=as.numeric(out[[3]]))
 
-      type2.est = error.summary( error.type = "type2", delta= delta.opt, root = 0, count= overshoot.summ$count,
-                                 inconclusive.vec= overshoot.summ$inconclusive.vec, R= repl, type2 = type2)
+      type2.est = error.summary( error.type = "type2", delta= delta.opt, root = 0, 
+                                 count= overshoot.summ$count,
+                                 inconclusive.vec= overshoot.summ$inconclusive.vec, 
+                                 R= repl, type2 = type2)
 
-      var.n1 = var(overshoot.summ$n.vec)
-      k.dec.n1 = abs(ceiling(log10(sqrt(var.n1/repl))))
-      avg.n1 = floor(mean(overshoot.summ$n.vec)*10^k.dec.n1)/(10^k.dec.n1)
+      avg.n1 = floor(mean(overshoot.summ$n.vec)*100)/100
 
       out.alt.opt = list("type2.est"=type2.est, "avg.n1"=avg.n1)
 
@@ -2610,17 +2557,8 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
 
   ## two sample z test
   if(test.type=="twoZ"){
-
-    # checking if N1.max is provided
-    if(missing(N1.max)==T){
-      return("Maximum budget on sample size for Group-1 is not provided")
-    }
-
-    # checking if N2.max is provided
-    if(missing(N2.max)==T){
-      return("Maximum budget on sample size for Group-2 is not provided")
-    }
-
+    
+    
     # checking if length(batch1.seq) and length(batch2.seq) are equal
     if( (missing(batch1.seq)==F) && (missing(batch2.seq)==F) && (length(batch1.seq)!=length(batch2.seq)) ){
       return("Lenghts of batch1.seq and batch2.seq are not matching. They should be same.")
@@ -2638,9 +2576,19 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
     
     ## msg
     if(verbose==T){
-      print("-------------------------------------------------------------------------")
-      print("Designing the MSPRT in case of a two-sample Z-test:")
-      print("-------------------------------------------------------------------------")
+      
+      if(((missing(batch1.seq)==F) && (sum(batch1.seq!=1)>0))||((missing(batch2.seq)==F) && (sum(batch2.seq!=1)>0))){
+        
+        print("-------------------------------------------------------------------------")
+        print("Designing the group sequential MSPRT in case of a two-sample Z-test:")
+        print("-------------------------------------------------------------------------")
+        
+      }else{
+        
+        print("-------------------------------------------------------------------------")
+        print("Designing the MSPRT in case of a two-sample Z-test:")
+        print("-------------------------------------------------------------------------")
+      }
     }
 
 
@@ -2661,7 +2609,90 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
         print(paste("Working with side = ",side," (user specified)", sep = ""))
       }
     }
-
+    
+    #default batch1 sequence and N1.max
+    if(missing(batch1.seq)==T){
+      
+      if(missing(N1.max)==T){
+        return("Error! Need to specify at least batch1.seq (batch sizes for Group-1) or N1.max (Maximum available sample size for Group-1)")
+      }else{
+        
+        batch1.seq = 1:N1.max
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N1.max = ", N1.max, sep = ""))
+          print(paste("             batch1.seq = ", 1, ":N1.max (default)", sep = ""))
+        }
+      }
+      
+    }else{
+      
+      if(missing(N1.max)==T){
+        
+        N1.max = sum(batch1.seq)
+        ## msg
+        if(verbose==T){
+          print(paste("             N1.max = ", N1.max, sep = ""))
+          print("             batch1.seq (user specified)")
+        }
+        
+      }else{
+        
+        if(sum(batch1.seq)!=N1.max) return("Error! Sum of batch sizes for Group-1 should add up to N1.max")
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N1.max = ", N1.max, sep = ""))
+          print("             batch1.seq (user specified)")
+        }
+      }
+      
+      batch1.seq = cumsum(batch1.seq)
+    }
+    
+    
+    #default batch2 sequence and N2.max
+    if(missing(batch2.seq)==T){
+      
+      if(missing(N2.max)==T){
+        return("Error! Need to specify at least batch2.seq (batch sizes for Group-2) or N2.max (Maximum available sample size for Group-2)")
+      }else{
+        
+        batch2.seq = 1:N2.max
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N2.max = ", N2.max, sep = ""))
+          print(paste("             batch2.seq = ", 1, ":N2.max (default)", sep = ""))
+        }
+      }
+      
+    }else{
+      
+      if(missing(N2.max)==T){
+        
+        N2.max = sum(batch2.seq)
+        ## msg
+        if(verbose==T){
+          print(paste("             N2.max = ", N2.max, sep = ""))
+          print("             batch2.seq (user specified)")
+        }
+        
+      }else{
+        
+        if(sum(batch2.seq)!=N2.max) return("Error! Sum of batch sizes for Group-2 should add up to N2.max")
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N2.max = ", N2.max, sep = ""))
+          print("             batch2.seq (user specified)")
+        }
+      }
+      
+      batch2.seq = cumsum(batch2.seq)
+    }
+    
 
     # type1
     if(missing(type1)==T){
@@ -2695,40 +2726,6 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
     }
 
 
-    # batch sequence
-    if(missing(batch1.seq)==T){
-
-      batch1.seq = 1:N1.max
-
-      ## msg
-      if(verbose==T){
-        print(paste("             batch1.seq = ",1,":N1.max (default)", sep = ""))
-      }
-    }else{
-
-      ##msg
-      if(verbose==T){
-        print("             batch1.seq (user specified)")
-      }
-    }
-
-    if(missing(batch2.seq)==T){
-
-      batch2.seq = 1:N2.max
-
-      ## msg
-      if(verbose==T){
-        print(paste("             batch2.seq = ",1,":N2.max (default)", sep = ""))
-      }
-    }else{
-
-      ##msg
-      if(verbose==T){
-        print("             batch2.seq (user specified)")
-      }
-    }
-
-
     # null
     ## msg
     if(verbose==T){
@@ -2757,7 +2754,12 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
     if(missing(repl)==T){
       repl = 1e+6
     }else{repl = repl}
-    k.dec = floor(log(sqrt(repl)))
+    # k.dec = floor(log(sqrt(repl)))
+    # k.dec=1
+    # while(type1!=round(type1,k.dec)){
+    #   k.dec = k.dec+1
+    # }
+    # k.dec = k.dec+1
 
     # default number of cores
     if(missing(core.no)==T){
@@ -2854,16 +2856,13 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
       print("OC of the obtained MSPRT under the null is being calculated:")
     }
 
-    k.dec.type1 = abs(ceiling(log10(sqrt((type1*(1- type1))/repl))))
-    type1.est = round( ((overshoot.summ$count + sum(overshoot.summ$inconclusive.vec>=delta.opt))/repl), (k.dec.type1 -1))
+    type1.est = error.summary( error.type = "type1", delta= delta.opt, root = 0, 
+                               count= overshoot.summ$count,
+                               inconclusive.vec= overshoot.summ$inconclusive.vec, 
+                               R= repl, type1 = type1)
 
-    var.n1_0 = var(overshoot.summ$n1.vec)
-    k.dec.n1_0 = abs(ceiling(log10(sqrt(var.n1_0/repl))))
-    avg.n1_0 = floor(mean(overshoot.summ$n1.vec)*10^k.dec.n1_0)/(10^k.dec.n1_0)
-
-    var.n2_0 = var(overshoot.summ$n2.vec)
-    k.dec.n2_0 = abs(ceiling(log10(sqrt(var.n2_0/repl))))
-    avg.n2_0 = floor(mean(overshoot.summ$n2.vec)*10^k.dec.n2_0)/(10^k.dec.n2_0)
+    avg.n1_0 = floor(mean(overshoot.summ$n1.vec)*100)/100
+    avg.n2_0 = floor(mean(overshoot.summ$n2.vec)*100)/100
 
     out.null.opt = list("type1.est"= type1.est, "avg.n1_0"= avg.n1_0, "avg.n2_0"= avg.n2_0)
 
@@ -2913,8 +2912,8 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
 
 
       # actual type 2 error probability at umpbt and fixed design
-      alt.type2 = type2.error.twoZ( alt = alt.comp, side = side, sigma0 = sigma0,
-                                    n1=N1.max, n2=N2.max, type1 = type1, root = 0)
+      alt.type2 = round(type2.error.twoZ( alt = alt.comp, side = side, sigma0 = sigma0,
+                                          n1=N1.max, n2=N2.max, type1 = type1, root = 0), 4)
 
 
       # performance under the corresponding alternative
@@ -2958,16 +2957,13 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
                             "n1.vec"=as.numeric(out[[3]]), "n2.vec"=as.numeric(out[[4]]) )
 
 
-      type2.est = error.summary( error.type = "type2", delta= delta.opt, root = 0, count= overshoot.summ$count,
-                                 inconclusive.vec= overshoot.summ$inconclusive.vec, R= repl, type2 = type2)
+      type2.est = error.summary( error.type = "type2", delta= delta.opt, root = 0, 
+                                 count= overshoot.summ$count,
+                                 inconclusive.vec= overshoot.summ$inconclusive.vec, 
+                                 R= repl, type2 = type2)
 
-      var.n1_1 = var(overshoot.summ$n1.vec)
-      k.dec.n1_1 = abs(ceiling(log10(sqrt(var.n1_1/repl))))
-      avg.n1_1 = floor(mean(overshoot.summ$n1.vec)*10^k.dec.n1_1)/(10^k.dec.n1_1)
-
-      var.n2_1 = var(overshoot.summ$n2.vec)
-      k.dec.n2_1 = abs(ceiling(log10(sqrt(var.n2_1/repl))))
-      avg.n2_1 = floor(mean(overshoot.summ$n2.vec)*10^k.dec.n2_1)/(10^k.dec.n2_1)
+      avg.n1_1 = floor(mean(overshoot.summ$n1.vec)*100)/100
+      avg.n2_1 = floor(mean(overshoot.summ$n2.vec)*100)/100
 
       out.alt.opt = list("type2.est"= type2.est, "avg.n1_1"= avg.n1_1, "avg.n2_1"= avg.n2_1)
 
@@ -2991,16 +2987,7 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
 
   ## two sample T-test
   if(test.type=="twoT"){
-
-    # checking if N1.max is provided
-    if(missing(N1.max)==T){
-      return("Maximum budget on sample size for Group-1 is not provided")
-    }
-
-    # checking if N2.max is provided
-    if(missing(N2.max)==T){
-      return("Maximum budget on sample size for Group-2 is not provided")
-    }
+    
 
     # checking if length(batch1.seq) and length(batch2.seq) are equal
     if( (missing(batch1.seq)==F) && (missing(batch2.seq)==F) && (length(batch1.seq)!=length(batch2.seq)) ){
@@ -3017,11 +3004,22 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
     if(missing(N.max)==F) print("'N.max' is ignored. Not required in a two-sample test.")
     
     
+    
     ## msg
     if(verbose==T){
-      print("-------------------------------------------------------------------------")
-      print("Designing the MSPRT in case of a two-sample T-test:")
-      print("-------------------------------------------------------------------------")
+      
+      if(((missing(batch1.seq)==F) && (sum(batch1.seq[-1]!=1)>0))||((missing(batch2.seq)==F) && (sum(batch2.seq[-1]!=1)>0))){
+        
+        print("-------------------------------------------------------------------------")
+        print("Designing the group sequential MSPRT in case of a two-sample T-test:")
+        print("-------------------------------------------------------------------------")
+        
+      }else{
+        
+        print("-------------------------------------------------------------------------")
+        print("Designing the MSPRT in case of a two-sample T-test:")
+        print("-------------------------------------------------------------------------")
+      }
     }
 
 
@@ -3042,7 +3040,95 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
         print(paste("Working with side = ",side," (user specified)", sep = ""))
       }
     }
-
+    
+    
+    #default batch1 sequence and N1.max
+    if(missing(batch1.seq)==T){
+      
+      if(missing(N1.max)==T){
+        return("Error! Need to specify at least batch1.seq (batch sizes for Group-1) or N1.max (Maximum available sample size for Group-1)")
+      }else{
+        
+        batch1.seq = 2:N1.max
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N1.max = ", N1.max, sep = ""))
+          print(paste("             batch1.seq = ", 2, ":N1.max (default)", sep = ""))
+        }
+      }
+      
+    }else{
+      
+      if(batch1.seq[1]<2) return("Error! First batch size for Group-1 should be at least 2")
+      
+      if(missing(N1.max)==T){
+        
+        N1.max = sum(batch1.seq)
+        ## msg
+        if(verbose==T){
+          print(paste("             N1.max = ", N1.max, sep = ""))
+          print("             batch1.seq (user specified)")
+        }
+        
+      }else{
+        
+        if(sum(batch1.seq)!=N1.max) return("Error! Sum of batch sizes for Group-1 should add up to N1.max")
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N1.max = ", N1.max, sep = ""))
+          print("             batch1.seq (user specified)")
+        }
+      }
+      
+      batch1.seq = cumsum(batch1.seq)
+    }
+    
+    
+    #default batch2 sequence and N2.max
+    if(missing(batch2.seq)==T){
+      
+      if(missing(N2.max)==T){
+        return("Error! Need to specify at least batch2.seq (batch sizes for Group-2) or N2.max (Maximum available sample size for Group-2)")
+      }else{
+        
+        batch2.seq = 2:N2.max
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N2.max = ", N2.max, sep = ""))
+          print(paste("             batch2.seq = ", 2, ":N2.max (default)", sep = ""))
+        }
+      }
+      
+    }else{
+      
+      if(batch2.seq[1]<2) return("Error! First batch size for Group-2 should be at least 2")
+      
+      if(missing(N2.max)==T){
+        
+        N2.max = sum(batch2.seq)
+        ## msg
+        if(verbose==T){
+          print(paste("             N2.max = ", N2.max, sep = ""))
+          print("             batch2.seq (user specified)")
+        }
+        
+      }else{
+        
+        if(sum(batch2.seq)!=N2.max) return("Error! Sum of batch sizes for Group-2 should add up to N2.max")
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N2.max = ", N2.max, sep = ""))
+          print("             batch2.seq (user specified)")
+        }
+      }
+      
+      batch2.seq = cumsum(batch2.seq)
+    }
+    
 
     # type1
     if(missing(type1)==T){
@@ -3076,43 +3162,6 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
     }
 
 
-    # default batch sequence
-    if( (missing(batch1.seq)==F) && (missing(batch2.seq)==F) ){
-
-      if(batch1.seq[1]<2){
-        return("batch1.seq[1]<2. Need at least 2 samples to compute the pooled sample standard deviation")
-      }
-      if(batch2.seq[1]<2){
-        return("batch2.seq[1]<2. Need at least 2 samples to compute the pooled sample standard deviation")
-      }
-      if( (batch2.seq[1]>1)&&(batch2.seq[1]>1) ){
-
-        ##msg
-        if(verbose==T){
-          print("             batch1.seq and batch2.seq (user specified)")
-        }
-      }
-    }
-    if(missing(batch1.seq)==T){
-
-      batch1.seq = 2:N1.max
-
-      ## msg
-      if(verbose==T){
-        print(paste("             batch1.seq = ",2,":N1.max (default)", sep = ""))
-      }
-    }
-    if(missing(batch2.seq)==T){
-
-      batch2.seq = 2:N2.max
-
-      ## msg
-      if(verbose==T){
-        print(paste("             batch1.seq = ",2,":N2.max (default)", sep = ""))
-      }
-    }
-
-
     # null
     ## msg
     if(verbose==T){
@@ -3124,7 +3173,13 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
     if(missing(repl)==T){
       repl = 1e+6
     }else{repl = repl}
-    k.dec = floor(log(sqrt(repl)))
+    # k.dec = floor(log(sqrt(repl)))
+    # k.dec=1
+    # while(type1!=round(type1,k.dec)){
+    #   k.dec = k.dec+1
+    # }
+    # k.dec = k.dec+1
+    
 
     # default number of cores
     if(missing(core.no)==T){
@@ -3210,16 +3265,13 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
       print("OC of the obtained MSPRT under the null is being calculated:")
     }
 
-    k.dec.type1 = abs(ceiling(log10(sqrt((type1*(1- type1))/repl))))
-    type1.est = round( ((overshoot.summ$count + sum(overshoot.summ$inconclusive.vec>=delta.opt))/repl), (k.dec.type1 -1))
+    type1.est = error.summary( error.type = "type1", delta= delta.opt, root = 0, 
+                               count= overshoot.summ$count,
+                               inconclusive.vec= overshoot.summ$inconclusive.vec, 
+                               R= repl, type1 = type1)
 
-    var.n1_0 = var(overshoot.summ$n1.vec)
-    k.dec.n1_0 = abs(ceiling(log10(sqrt(var.n1_0/repl))))
-    avg.n1_0 = floor(mean(overshoot.summ$n1.vec)*10^k.dec.n1_0)/(10^k.dec.n1_0)
-
-    var.n2_0 = var(overshoot.summ$n2.vec)
-    k.dec.n2_0 = abs(ceiling(log10(sqrt(var.n2_0/repl))))
-    avg.n2_0 = floor(mean(overshoot.summ$n2.vec)*10^k.dec.n2_0)/(10^k.dec.n2_0)
+    avg.n1_0 = floor(mean(overshoot.summ$n1.vec)*100)/100
+    avg.n2_0 = floor(mean(overshoot.summ$n2.vec)*100)/100
 
     out.null.opt = list("type1.est"= type1.est, "avg.n1_0"= avg.n1_0, "avg.n2_0"= avg.n2_0)
 
@@ -3268,8 +3320,8 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
 
 
       # actual type 2 error probability at umpbt and fixed design
-      alt.type2 = type2.error.twoT( alt = alt.comp, side = side,
-                                    n1=N1.max, n2=N2.max, type1 = type1, root = 0)
+      alt.type2 = round(type2.error.twoT( alt = alt.comp, side = side,
+                                          n1=N1.max, n2=N2.max, type1 = type1, root = 0), 4)
 
 
       # performance under the corresponding alternative
@@ -3313,16 +3365,13 @@ design.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq,
                             "n1.vec"=as.numeric(out[[3]]), "n2.vec"=as.numeric(out[[4]]) )
 
 
-      type2.est = error.summary( error.type = "type2", delta= delta.opt, root = 0, count= overshoot.summ$count,
-                                 inconclusive.vec= overshoot.summ$inconclusive.vec, R= repl, type2 = type2)
+      type2.est = error.summary( error.type = "type2", delta= delta.opt, root = 0, 
+                                 count= overshoot.summ$count,
+                                 inconclusive.vec= overshoot.summ$inconclusive.vec, 
+                                 R= repl, type2 = type2)
 
-      var.n1_1 = var(overshoot.summ$n1.vec)
-      k.dec.n1_1 = abs(ceiling(log10(sqrt(var.n1_1/repl))))
-      avg.n1_1 = floor(mean(overshoot.summ$n1.vec)*10^k.dec.n1_1)/(10^k.dec.n1_1)
-
-      var.n2_1 = var(overshoot.summ$n2.vec)
-      k.dec.n2_1 = abs(ceiling(log10(sqrt(var.n2_1/repl))))
-      avg.n2_1 = floor(mean(overshoot.summ$n2.vec)*10^k.dec.n2_1)/(10^k.dec.n2_1)
+      avg.n1_1 = floor(mean(overshoot.summ$n1.vec)*100)/100
+      avg.n2_1 = floor(mean(overshoot.summ$n2.vec)*100)/100
 
       out.alt.opt = list("type2.est"= type2.est, "avg.n1_1"= avg.n1_1, "avg.n2_1"= avg.n2_1)
 
@@ -3551,11 +3600,7 @@ implement.MSPRT = function( test.type, obs, obs1, obs2, side, batch.seq, batch1.
                             N.max, N1.max, N2.max, plot.it=T, verbose=T){
 
   if(test.type=="oneProp"){
-
-    # checking if N.max is provided
-    if(missing(N.max)==T){
-      return("Maximum available sample size is not provided")
-    }
+    
     
     # ignoring obs1 & obs2
     if(missing(obs1)==F) print("'obs1' is ignored. Not required in a one-sample test.")
@@ -3571,11 +3616,23 @@ implement.MSPRT = function( test.type, obs, obs1, obs2, side, batch.seq, batch1.
     
     
     
+    ## msg
     if(verbose==T){
-      print("-------------------------------------------------------------------------")
-      print("Implementing the MSPRT in case of a one-sample binomial proportion test:")
-      print("-------------------------------------------------------------------------")
+      
+      if((missing(batch.seq)==F) && (sum(batch.seq!=1)>0)){
+        
+        print("-------------------------------------------------------------------------")
+        print("Implementing the group sequential MSPRT in case of a one-sample proportion test:")
+        print("-------------------------------------------------------------------------")
+        
+      }else{
+        
+        print("-------------------------------------------------------------------------")
+        print("Implementing the MSPRT in case of a one-sample proportion test:")
+        print("-------------------------------------------------------------------------")
+      }
     }
+    
 
     # direction of H1
     if(missing(side)==T){
@@ -3593,21 +3650,49 @@ implement.MSPRT = function( test.type, obs, obs1, obs2, side, batch.seq, batch1.
       }
     }
 
-    #default batch sequence
+    
+    
+    #default batch sequence and N.max
     if(missing(batch.seq)==T){
-      batch.seq = 1:N.max
-
-      ## msg
-      if(verbose==T){
-        print(paste("             batch.seq = ",1,":N.max (default)", sep = ""))
+      
+      if(missing(N.max)==T){
+        return("Error! Need to specify at least batch.seq (batch sizes) or N.max (Maximum available sample size)")
+      }else{
+        
+        batch.seq = 1:N.max
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N.max = ", N.max, sep = ""))
+          print(paste("             batch.seq = ", 1, ":N.max (default)", sep = ""))
+        }
       }
+      
     }else{
-
-      ##msg
-      if(verbose==T){
-        print("             batch.seq (user specified)")
+      
+      if(missing(N.max)==T){
+        
+        N.max = sum(batch.seq)
+        ## msg
+        if(verbose==T){
+          print(paste("             N.max = ", N.max, sep = ""))
+          print("             batch.seq (user specified)")
+        }
+        
+      }else{
+        
+        if(sum(batch.seq)!=N.max) return("Error! Sum of batch sizes should add up to N.max")
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N.max = ", N.max, sep = ""))
+          print("             batch.seq (user specified)")
+        }
       }
+      
+      batch.seq = cumsum(batch.seq)
     }
+    
 
     # type1
     if(missing(type1)==T){
@@ -3738,23 +3823,46 @@ implement.MSPRT = function( test.type, obs, obs1, obs2, side, batch.seq, batch1.
 
     if(plot.it==T){
 
-      ylow = 0
-      if(out$decision=="accept"){
+      # ylow = 0
+      # if(out$decision=="accept"){
+        # plot.title= paste(testname,": Accept Null (n =",out$n,")")
+      #   yup = max(LR.seq)
+      # }else if( (out$decision=="reject") && (out$n<batch.seq[length(batch.seq)]) ){
+      #   plot.title= paste(testname,": Reject Null (n =",out$n,")")
+      #   yup = max(LR.seq)
+      # }else if( (out$decision=="reject") && (out$n==batch.seq[length(batch.seq)]) ){
+      #   plot.title= paste(testname,": Reject Null (n =",out$n,")")
+      #   yup = wald.up
+      # }else if(out$decision=="continue"){
+      #   plot.title= paste(testname,": Continue sampling (n =",out$n,")")
+      #   yup = wald.up
+      # }
+      
+      if( (out$decision=="accept") && (out$exit.stage<length(batch.seq)) ){
         plot.title= paste(testname,": Accept Null (n =",out$n,")")
+        ylow = min(LR.seq)
         yup = max(LR.seq)
-      }else if( (out$decision=="reject") && (out$n<batch.seq[length(batch.seq)]) ){
+      }else if( (out$decision=="accept") && (out$exit.stage==length(batch.seq)) ){
+        plot.title= paste(testname,": Accept Null (n =",out$n,")")
+        ylow = 0
+        yup = wald.up
+      }else if( (out$decision=="reject") && (out$exit.stage<length(batch.seq)) ){
         plot.title= paste(testname,": Reject Null (n =",out$n,")")
+        ylow = 0
         yup = max(LR.seq)
-      }else if( (out$decision=="reject") && (out$n==batch.seq[length(batch.seq)]) ){
+      }else if( (out$decision=="reject") && (out$exit.stage==length(batch.seq)) ){
         plot.title= paste(testname,": Reject Null (n =",out$n,")")
+        ylow = 0
         yup = wald.up
       }else if(out$decision=="continue"){
         plot.title= paste(testname,": Continue sampling (n =",out$n,")")
+        ylow = 0
         yup = wald.up
       }
 
 
-      legend.label = c("Rejection Threshold","Acceptance Threshold","Likelihood ratio","Termination Threshold")
+      legend.label = c("Rejection Threshold","Acceptance Threshold",
+                       "Wtd. likelihood ratio","Termination Threshold")
 
 
       plot.df = data.frame(xcol=batch.seq,ycol=upper.threshold,group=rep("a",length(batch.seq)))
@@ -3788,11 +3896,7 @@ implement.MSPRT = function( test.type, obs, obs1, obs2, side, batch.seq, batch1.
                 "umpbt.alt" = alt.LR, "psi.umpbt" = alt.psi ))
 
   }else if(test.type=="oneZ"){
-
-    # checking if N.max is provided
-    if(missing(N.max)==T){
-      return("Maximum available sample size is not provided")
-    }
+    
     
     # ignoring obs1 & obs2
     if(missing(obs1)==F) print("'obs1' is ignored. Not required in a one-sample test.")
@@ -3808,9 +3912,22 @@ implement.MSPRT = function( test.type, obs, obs1, obs2, side, batch.seq, batch1.
     
     
     
-    print("-------------------------------------------------------------------------")
-    print("Implementing the MSPRT in case of a one-sample Z-test:")
-    print("-------------------------------------------------------------------------")
+    ## msg
+    if(verbose==T){
+      
+      if((missing(batch.seq)==F) && (sum(batch.seq!=1)>0)){
+        
+        print("-------------------------------------------------------------------------")
+        print("Implementing the group sequential MSPRT in case of a one-sample Z-test:")
+        print("-------------------------------------------------------------------------")
+        
+      }else{
+        
+        print("-------------------------------------------------------------------------")
+        print("Implementing the MSPRT in case of a one-sample Z-test:")
+        print("-------------------------------------------------------------------------")
+      }
+    }
 
 
     # direction of H1
@@ -3829,20 +3946,46 @@ implement.MSPRT = function( test.type, obs, obs1, obs2, side, batch.seq, batch1.
       }
     }
 
-    #default batch sequence
+    
+    #default batch sequence and N.max
     if(missing(batch.seq)==T){
-      batch.seq = 1:N.max
-
-      ## msg
-      if(verbose==T){
-        print(paste("             batch.seq = ",1,":N.max (default)", sep = ""))
+      
+      if(missing(N.max)==T){
+        return("Error! Need to specify at least batch.seq (batch sizes) or N.max (Maximum available sample size)")
+      }else{
+        
+        batch.seq = 1:N.max
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N.max = ", N.max, sep = ""))
+          print(paste("             batch.seq = ", 1, ":N.max (default)", sep = ""))
+        }
       }
+      
     }else{
-
-      ##msg
-      if(verbose==T){
-        print("             batch.seq (user specified)")
+      
+      if(missing(N.max)==T){
+        
+        N.max = sum(batch.seq)
+        ## msg
+        if(verbose==T){
+          print(paste("             N.max = ", N.max, sep = ""))
+          print("             batch.seq (user specified)")
+        }
+        
+      }else{
+        
+        if(sum(batch.seq)!=N.max) return("Error! Sum of batch sizes should add up to N.max")
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N.max = ", N.max, sep = ""))
+          print("             batch.seq (user specified)")
+        }
       }
+      
+      batch.seq = cumsum(batch.seq)
     }
 
 
@@ -3973,23 +4116,46 @@ implement.MSPRT = function( test.type, obs, obs1, obs2, side, batch.seq, batch1.
 
     if(plot.it==T){
 
-      ylow = 0
-      if(out$decision=="accept"){
+      # ylow = 0
+      # if(out$decision=="accept"){
+      #   plot.title= paste(testname,": Accept Null (n =",out$n,")")
+      #   yup = max(LR.seq)
+      # }else if( (out$decision=="reject") && (out$n<batch.seq[length(batch.seq)]) ){
+      #   plot.title= paste(testname,": Reject Null (n =",out$n,")")
+      #   yup = max(LR.seq)
+      # }else if( (out$decision=="reject") && (out$n==batch.seq[length(batch.seq)]) ){
+      #   plot.title= paste(testname,": Reject Null (n =",out$n,")")
+      #   yup = wald.up
+      # }else if(out$decision=="continue"){
+      #   plot.title= paste(testname,": Continue sampling (n =",out$n,")")
+      #   yup = wald.up
+      # }
+      
+      if( (out$decision=="accept") && (out$exit.stage<length(batch.seq)) ){
         plot.title= paste(testname,": Accept Null (n =",out$n,")")
+        ylow = min(LR.seq)
         yup = max(LR.seq)
-      }else if( (out$decision=="reject") && (out$n<batch.seq[length(batch.seq)]) ){
+      }else if( (out$decision=="accept") && (out$exit.stage==length(batch.seq)) ){
+        plot.title= paste(testname,": Accept Null (n =",out$n,")")
+        ylow = 0
+        yup = wald.up
+      }else if( (out$decision=="reject") && (out$exit.stage<length(batch.seq)) ){
         plot.title= paste(testname,": Reject Null (n =",out$n,")")
+        ylow = 0
         yup = max(LR.seq)
-      }else if( (out$decision=="reject") && (out$n==batch.seq[length(batch.seq)]) ){
+      }else if( (out$decision=="reject") && (out$exit.stage==length(batch.seq)) ){
         plot.title= paste(testname,": Reject Null (n =",out$n,")")
+        ylow = 0
         yup = wald.up
       }else if(out$decision=="continue"){
         plot.title= paste(testname,": Continue sampling (n =",out$n,")")
+        ylow = 0
         yup = wald.up
       }
 
 
-      legend.label = c("Rejection Threshold","Acceptance Threshold","Likelihood ratio","Termination Threshold")
+      legend.label = c("Rejection Threshold","Acceptance Threshold",
+                       "Likelihood ratio","Termination Threshold")
 
 
       plot.df = data.frame(xcol=batch.seq,ycol=upper.threshold,group=rep("a",length(batch.seq)))
@@ -4022,11 +4188,7 @@ implement.MSPRT = function( test.type, obs, obs1, obs2, side, batch.seq, batch1.
                 "umpbt.alt" = alt.LR ))
 
   }else if(test.type=="oneT"){
-
-    # checking if N.max is provided
-    if(missing(N.max)==T){
-      return("Maximum available sample size is not provided")
-    }
+    
     
     # ignoring obs1 & obs2
     if(missing(obs1)==F) print("'obs1' is ignored. Not required in a one-sample test.")
@@ -4042,9 +4204,22 @@ implement.MSPRT = function( test.type, obs, obs1, obs2, side, batch.seq, batch1.
     
     
     
-    print("-------------------------------------------------------------------------")
-    print("Implementing the MSPRT in case of a one-sample T-test:")
-    print("-------------------------------------------------------------------------")
+    ## msg
+    if(verbose==T){
+      
+      if((missing(batch.seq)==F) && (sum(batch.seq[-1]!=1)>0)){
+        
+        print("-------------------------------------------------------------------------")
+        print("Implementing the group sequential MSPRT in case of a one-sample T-test:")
+        print("-------------------------------------------------------------------------")
+        
+      }else{
+        
+        print("-------------------------------------------------------------------------")
+        print("Implementing the MSPRT in case of a one-sample T-test:")
+        print("-------------------------------------------------------------------------")
+      }
+    }
 
 
     # direction of H1
@@ -4062,22 +4237,51 @@ implement.MSPRT = function( test.type, obs, obs1, obs2, side, batch.seq, batch1.
         print(paste("Working with side = ",side," (user specified)", sep = ""))
       }
     }
-
-    #default batch sequence
+    
+    
+    #default batch sequence and N.max
     if(missing(batch.seq)==T){
-      batch.seq = 2:N.max
-
-      ## msg
-      if(verbose==T){
-        print(paste("             batch.seq = ",2,":N.max (default)", sep = ""))
+      
+      if(missing(N.max)==T){
+        return("Error! Need to specify at least batch.seq (batch sizes) or N.max (Maximum available sample size)")
+      }else{
+        
+        batch.seq = 2:N.max
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N.max = ", N.max, sep = ""))
+          print(paste("             batch.seq = ", 2, ":N.max (default)", sep = ""))
+        }
       }
+      
     }else{
-
-      ##msg
-      if(verbose==T){
-        print("             batch.seq (user specified)")
+      
+      if(batch.seq[1]<2) return("Error! First batch size should be at least 2")
+      
+      if(missing(N.max)==T){
+        
+        N.max = sum(batch.seq)
+        ## msg
+        if(verbose==T){
+          print(paste("             N.max = ", N.max, sep = ""))
+          print("             batch.seq (user specified)")
+        }
+        
+      }else{
+        
+        if(sum(batch.seq)!=N.max) return("Error! Sum of batch sizes should add up to N.max")
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N.max = ", N.max, sep = ""))
+          print("             batch.seq (user specified)")
+        }
       }
+      
+      batch.seq = cumsum(batch.seq)
     }
+    
 
     # type1
     if(missing(type1)==T){
@@ -4174,7 +4378,7 @@ implement.MSPRT = function( test.type, obs, obs1, obs2, side, batch.seq, batch1.
 
     }
 
-    # comparing sequence of bayes factor with thresholds
+    # comparing sequence of Likelihood ratio with thresholds
     out = check( test.type = test.type, statistic = LR.seq, batch.seq = batch.seq,
                  upper = upper.threshold, lower = lower.threshold, threshold = term.thresh)
 
@@ -4190,29 +4394,52 @@ implement.MSPRT = function( test.type, obs, obs1, obs2, side, batch.seq, batch1.
 
     ## plots names
     testname = "One-sample T-test"
-    ylabname = "Bayes factor in favor of the UMPBT alternative"
+    ylabname = "Likelihood ratio in favor of the UMPBT alternative"
 
     # plotting sequence of bayes factor together with thresholds
 
     if(plot.it==T){
 
-      ylow = 0
-      if(out$decision=="accept"){
+      # ylow = 0
+      # if(out$decision=="accept"){
+      #   plot.title= paste(testname,": Accept Null (n =",out$n,")")
+      #   yup = max(LR.seq)
+      # }else if( (out$decision=="reject") && (out$n<batch.seq[length(batch.seq)]) ){
+      #   plot.title= paste(testname,": Reject Null (n =",out$n,")")
+      #   yup = max(LR.seq)
+      # }else if( (out$decision=="reject") && (out$n==batch.seq[length(batch.seq)]) ){
+      #   plot.title= paste(testname,": Reject Null (n =",out$n,")")
+      #   yup = wald.up
+      # }else if(out$decision=="continue"){
+      #   plot.title= paste(testname,": Continue sampling (n =",out$n,")")
+      #   yup = wald.up
+      # }
+      
+      if( (out$decision=="accept") && (out$exit.stage<length(batch.seq)) ){
         plot.title= paste(testname,": Accept Null (n =",out$n,")")
+        ylow = min(LR.seq)
         yup = max(LR.seq)
-      }else if( (out$decision=="reject") && (out$n<batch.seq[length(batch.seq)]) ){
+      }else if( (out$decision=="accept") && (out$exit.stage==length(batch.seq)) ){
+        plot.title= paste(testname,": Accept Null (n =",out$n,")")
+        ylow = 0
+        yup = wald.up
+      }else if( (out$decision=="reject") && (out$exit.stage<length(batch.seq)) ){
         plot.title= paste(testname,": Reject Null (n =",out$n,")")
+        ylow = 0
         yup = max(LR.seq)
-      }else if( (out$decision=="reject") && (out$n==batch.seq[length(batch.seq)]) ){
+      }else if( (out$decision=="reject") && (out$exit.stage==length(batch.seq)) ){
         plot.title= paste(testname,": Reject Null (n =",out$n,")")
+        ylow = 0
         yup = wald.up
       }else if(out$decision=="continue"){
         plot.title= paste(testname,": Continue sampling (n =",out$n,")")
+        ylow = 0
         yup = wald.up
       }
 
 
-      legend.label = c("Rejection Threshold","Acceptance Threshold","Likelihood ratio","Termination Threshold")
+      legend.label = c("Rejection Threshold","Acceptance Threshold",
+                       "Likelihood ratio","Termination Threshold")
 
 
       plot.df = data.frame(xcol=batch.seq,ycol=upper.threshold,group=rep("a",length(batch.seq)))
@@ -4245,17 +4472,8 @@ implement.MSPRT = function( test.type, obs, obs1, obs2, side, batch.seq, batch1.
                 "umpbt.alt" = alt.LR ))
 
   }else if(test.type=="twoZ"){
-
-    # checking if N1.max is provided
-    if(missing(N1.max)==T){
-      return("Maximum budget on sample size for Group-1 is not provided")
-    }
-
-    # checking if N2.max is provided
-    if(missing(N2.max)==T){
-      return("Maximum budget on sample size for Group-2 is not provided")
-    }
-
+    
+    
     # checking if length(batch1.seq) and length(batch2.seq) are equal
     if( (missing(batch1.seq)==F) && (missing(batch2.seq)==F) && (length(batch1.seq)!=length(batch2.seq)) ){
       return("Lenghts of batch1.seq and batch2.seq are not matching. They should be same.")
@@ -4277,9 +4495,19 @@ implement.MSPRT = function( test.type, obs, obs1, obs2, side, batch.seq, batch1.
     
     ## msg
     if(verbose==T){
-      print("-------------------------------------------------------------------------")
-      print("Implementing the MSPRT in case of a two-sample Z-test:")
-      print("-------------------------------------------------------------------------")
+      
+      if(((missing(batch1.seq)==F) && (sum(batch1.seq!=1)>0))||((missing(batch2.seq)==F) && (sum(batch2.seq!=1)>0))){
+        
+        print("-------------------------------------------------------------------------")
+        print("Implementing the group sequential MSPRT in case of a two-sample Z-test:")
+        print("-------------------------------------------------------------------------")
+        
+      }else{
+        
+        print("-------------------------------------------------------------------------")
+        print("Implementing the MSPRT in case of a two-sample Z-test:")
+        print("-------------------------------------------------------------------------")
+      }
     }
 
 
@@ -4300,7 +4528,91 @@ implement.MSPRT = function( test.type, obs, obs1, obs2, side, batch.seq, batch1.
         print(paste("Working with side = ",side," (user specified)", sep = ""))
       }
     }
-
+    
+    
+    #default batch1 sequence and N1.max
+    if(missing(batch1.seq)==T){
+      
+      if(missing(N1.max)==T){
+        return("Error! Need to specify at least batch1.seq (batch sizes for Group-1) or N1.max (Maximum available sample size for Group-1)")
+      }else{
+        
+        batch1.seq = 1:N1.max
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N1.max = ", N1.max, sep = ""))
+          print(paste("             batch1.seq = ", 1, ":N1.max (default)", sep = ""))
+        }
+      }
+      
+    }else{
+      
+      if(missing(N1.max)==T){
+        
+        N1.max = sum(batch1.seq)
+        ## msg
+        if(verbose==T){
+          print(paste("             N1.max = ", N1.max, sep = ""))
+          print("             batch1.seq (user specified)")
+        }
+        
+      }else{
+        
+        if(sum(batch1.seq)!=N1.max) return("Error! Sum of batch sizes for Group-1 should add up to N1.max")
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N1.max = ", N1.max, sep = ""))
+          print("             batch1.seq (user specified)")
+        }
+      }
+      
+      batch1.seq = cumsum(batch1.seq)
+    }
+    
+    
+    #default batch2 sequence and N2.max
+    if(missing(batch2.seq)==T){
+      
+      if(missing(N2.max)==T){
+        return("Error! Need to specify at least batch2.seq (batch sizes for Group-2) or N2.max (Maximum available sample size for Group-2)")
+      }else{
+        
+        batch2.seq = 1:N2.max
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N2.max = ", N2.max, sep = ""))
+          print(paste("             batch2.seq = ", 1, ":N2.max (default)", sep = ""))
+        }
+      }
+      
+    }else{
+      
+      if(missing(N2.max)==T){
+        
+        N2.max = sum(batch2.seq)
+        ## msg
+        if(verbose==T){
+          print(paste("             N2.max = ", N2.max, sep = ""))
+          print("             batch2.seq (user specified)")
+        }
+        
+      }else{
+        
+        if(sum(batch2.seq)!=N2.max) return("Error! Sum of batch sizes for Group-2 should add up to N2.max")
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N2.max = ", N2.max, sep = ""))
+          print("             batch2.seq (user specified)")
+        }
+      }
+      
+      batch2.seq = cumsum(batch2.seq)
+    }
+    
 
     # type1
     if(missing(type1)==T){
@@ -4330,40 +4642,6 @@ implement.MSPRT = function( test.type, obs, obs1, obs2, side, batch.seq, batch1.
       ## msg
       if(verbose==T){
         print(paste("             type2 = ",type2," (user specified)", sep = ""))
-      }
-    }
-
-
-    # batch sequence
-    if(missing(batch1.seq)==T){
-
-      batch1.seq = 1:N1.max
-
-      ## msg
-      if(verbose==T){
-        print(paste("             batch1.seq = ",1,":N1.max (default)", sep = ""))
-      }
-    }else{
-
-      ##msg
-      if(verbose==T){
-        print("             batch1.seq (user specified)")
-      }
-    }
-
-    if(missing(batch2.seq)==T){
-
-      batch2.seq = 1:N2.max
-
-      ## msg
-      if(verbose==T){
-        print(paste("             batch2.seq = ",1,":N2.max (default)", sep = ""))
-      }
-    }else{
-
-      ##msg
-      if(verbose==T){
-        print("             batch2.seq (user specified)")
       }
     }
 
@@ -4463,23 +4741,47 @@ implement.MSPRT = function( test.type, obs, obs1, obs2, side, batch.seq, batch1.
 
     if(plot.it==T){
 
-      ylow = 0
-      if(out$decision=="accept"){
+      # ylow = 0
+      # if(out$decision=="accept"){
+      #   plot.title= paste(testname,": Accept Null (n1 =",out$n1,", n2 =",out$n2,")")
+      #   yup = max(LR.seq)
+      # }else if( (out$decision=="reject") && (out$exit.stage<length(batch1.seq)) ){
+      #   plot.title= paste(testname,": Reject Null (n1 =",out$n1,", n2 =",out$n2,")")
+      #   yup = max(LR.seq)
+      # }else if( (out$decision=="reject") && (out$exit.stage==length(batch1.seq)) ){
+      #   plot.title= paste(testname,": Reject Null (n1 =",out$n1,", n2 =",out$n2,")")
+      #   yup = wald.up
+      # }else if(out$decision=="continue"){
+      #   plot.title= paste(testname,": Continue sampling (n1 =",out$n1,", n2 =",out$n2,")")
+      #   yup = wald.up
+      # }
+      
+      
+      if( (out$decision=="accept") && (out$exit.stage<length(batch1.seq)) ){
         plot.title= paste(testname,": Accept Null (n1 =",out$n1,", n2 =",out$n2,")")
+        ylow = min(LR.seq)
         yup = max(LR.seq)
+      }else if( (out$decision=="accept") && (out$exit.stage==length(batch1.seq)) ){
+        plot.title= paste(testname,": Accept Null (n1 =",out$n1,", n2 =",out$n2,")")
+        ylow = 0
+        yup = wald.up
       }else if( (out$decision=="reject") && (out$exit.stage<length(batch1.seq)) ){
         plot.title= paste(testname,": Reject Null (n1 =",out$n1,", n2 =",out$n2,")")
+        ylow = 0
         yup = max(LR.seq)
       }else if( (out$decision=="reject") && (out$exit.stage==length(batch1.seq)) ){
         plot.title= paste(testname,": Reject Null (n1 =",out$n1,", n2 =",out$n2,")")
+        ylow = 0
         yup = wald.up
       }else if(out$decision=="continue"){
         plot.title= paste(testname,": Continue sampling (n1 =",out$n1,", n2 =",out$n2,")")
+        ylow = 0
         yup = wald.up
       }
 
 
-      legend.label = c("Rejection Threshold","Acceptance Threshold","Likelihood ratio","Termination Threshold")
+      legend.label = c("Rejection Threshold","Acceptance Threshold",
+                       "Likelihood ratio","Termination Threshold")
 
 
       plot.df = data.frame(xcol = seq(length(batch1.seq)), ycol = upper.threshold, group = rep("a",length(batch1.seq)))
@@ -4503,7 +4805,7 @@ implement.MSPRT = function( test.type, obs, obs1, obs2, side, batch.seq, batch1.
               legend.background = element_rect(fill="lightblue", size=0.5, linetype="solid", colour ="darkblue")) +
         guides(colour = guide_legend(override.aes = list(linetype=c(1,1,1,0), shape=16))) +
         ggtitle(plot.title) +
-        xlab("Comparison stages") + ylab(ylabname) +
+        xlab("Sample size") + ylab(ylabname) +
         ylim(ylow,yup)
 
       suppressWarnings(print(p))
@@ -4543,9 +4845,22 @@ implement.MSPRT = function( test.type, obs, obs1, obs2, side, batch.seq, batch1.
     
     
     
-    print("-------------------------------------------------------------------------")
-    print("Implementing the MSPRT in case of a two-sample T-test:")
-    print("-------------------------------------------------------------------------")
+    ## msg
+    if(verbose==T){
+      
+      if(((missing(batch1.seq)==F) && (sum(batch1.seq[-1]!=1)>0))||((missing(batch2.seq)==F) && (sum(batch2.seq[-1]!=1)>0))){
+        
+        print("-------------------------------------------------------------------------")
+        print("Implementing the group sequential MSPRT in case of a two-sample T-test:")
+        print("-------------------------------------------------------------------------")
+        
+      }else{
+        
+        print("-------------------------------------------------------------------------")
+        print("Implementing the MSPRT in case of a two-sample T-test:")
+        print("-------------------------------------------------------------------------")
+      }
+    }
 
 
     ## setting default arguments
@@ -4565,7 +4880,95 @@ implement.MSPRT = function( test.type, obs, obs1, obs2, side, batch.seq, batch1.
         print(paste("Working with side = ",side," (user specified)", sep = ""))
       }
     }
-
+    
+    
+    #default batch1 sequence and N1.max
+    if(missing(batch1.seq)==T){
+      
+      if(missing(N1.max)==T){
+        return("Error! Need to specify at least batch1.seq (batch sizes for Group-1) or N1.max (Maximum available sample size for Group-1)")
+      }else{
+        
+        batch1.seq = 2:N1.max
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N1.max = ", N1.max, sep = ""))
+          print(paste("             batch1.seq = ", 2, ":N1.max (default)", sep = ""))
+        }
+      }
+      
+    }else{
+      
+      if(batch1.seq[1]<2) return("Error! First batch size for Group-1 should be at least 2")
+      
+      if(missing(N1.max)==T){
+        
+        N1.max = sum(batch1.seq)
+        ## msg
+        if(verbose==T){
+          print(paste("             N1.max = ", N1.max, sep = ""))
+          print("             batch1.seq (user specified)")
+        }
+        
+      }else{
+        
+        if(sum(batch1.seq)!=N1.max) return("Error! Sum of batch sizes for Group-1 should add up to N1.max")
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N1.max = ", N1.max, sep = ""))
+          print("             batch1.seq (user specified)")
+        }
+      }
+      
+      batch1.seq = cumsum(batch1.seq)
+    }
+    
+    
+    #default batch2 sequence and N2.max
+    if(missing(batch2.seq)==T){
+      
+      if(missing(N2.max)==T){
+        return("Error! Need to specify at least batch2.seq (batch sizes for Group-2) or N2.max (Maximum available sample size for Group-2)")
+      }else{
+        
+        batch2.seq = 2:N2.max
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N2.max = ", N2.max, sep = ""))
+          print(paste("             batch2.seq = ", 2, ":N2.max (default)", sep = ""))
+        }
+      }
+      
+    }else{
+      
+      if(batch2.seq[1]<2) return("Error! First batch size for Group-2 should be at least 2")
+      
+      if(missing(N2.max)==T){
+        
+        N2.max = sum(batch2.seq)
+        ## msg
+        if(verbose==T){
+          print(paste("             N2.max = ", N2.max, sep = ""))
+          print("             batch2.seq (user specified)")
+        }
+        
+      }else{
+        
+        if(sum(batch2.seq)!=N2.max) return("Error! Sum of batch sizes for Group-2 should add up to N2.max")
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N2.max = ", N2.max, sep = ""))
+          print("             batch2.seq (user specified)")
+        }
+      }
+      
+      batch2.seq = cumsum(batch2.seq)
+    }
+    
 
     # type1
     if(missing(type1)==T){
@@ -4595,43 +4998,6 @@ implement.MSPRT = function( test.type, obs, obs1, obs2, side, batch.seq, batch1.
       ## msg
       if(verbose==T){
         print(paste("             type2 = ",type2," (user specified)", sep = ""))
-      }
-    }
-
-
-    # default batch sequence
-    if( (missing(batch1.seq)==F) && (missing(batch2.seq)==F) ){
-
-      if(batch1.seq[1]<2){
-        return("batch1.seq[1]<2. Need at least 2 samples to compute the pooled sample standard deviation")
-      }
-      if(batch2.seq[1]<2){
-        return("batch2.seq[1]<2. Need at least 2 samples to compute the pooled sample standard deviation")
-      }
-      if( (batch2.seq[1]>1)&&(batch2.seq[1]>1) ){
-
-        ##msg
-        if(verbose==T){
-          print("             batch1.seq and batch2.seq (user specified)")
-        }
-      }
-    }
-    if(missing(batch1.seq)==T){
-
-      batch1.seq = 2:N1.max
-
-      ## msg
-      if(verbose==T){
-        print(paste("             batch1.seq = ",2,":N1.max (default)", sep = ""))
-      }
-    }
-    if(missing(batch2.seq)==T){
-
-      batch2.seq = 2:N2.max
-
-      ## msg
-      if(verbose==T){
-        print(paste("             batch1.seq = ",2,":N2.max (default)", sep = ""))
       }
     }
 
@@ -4691,7 +5057,7 @@ implement.MSPRT = function( test.type, obs, obs1, obs2, side, batch.seq, batch1.
     if(verbose==T){
       print("-------------------------------------------------------------------------")
 
-      print(paste("UMPBT alternatives and Likelihood ratios have been obtained"))
+      print(paste("UMPBT alternatives and likelihood ratios have been obtained"))
 
     }
 
@@ -4710,43 +5076,91 @@ implement.MSPRT = function( test.type, obs, obs1, obs2, side, batch.seq, batch1.
 
     ## plots names
     testname = "Two-sample T-test"
-    ylabname = "Bayes factor in favor of the UMPBT alternative"
+    ylabname = "Likelihood ratio in favor of the UMPBT alternative"
 
     # plotting sequence of bayes factor together with thresholds
 
     if(plot.it==T){
 
-      ylow = 0
-      if(out$decision=="accept"){
+      # ylow = 0
+      # if( (out$decision=="accept") && (out$exit.stage<length(batch1.seq)) ){
+      #   plot.title= paste(testname,": Accept Null (n1 =",out$n1,", n2 =",out$n2,")")
+      #   yup = max(LR.seq)
+      # }else if( (out$decision=="reject") && (out$exit.stage<length(batch1.seq)) ){
+      #   plot.title= paste(testname,": Reject Null (n1 =",out$n1,", n2 =",out$n2,")")
+      #   yup = max(LR.seq)
+      # }else if( (out$decision=="reject") && (out$exit.stage==length(batch1.seq)) ){
+      #   plot.title= paste(testname,": Reject Null (n1 =",out$n1,", n2 =",out$n2,")")
+      #   yup = wald.up
+      # }else if(out$decision=="continue"){
+      #   plot.title= paste(testname,": Continue sampling (n1 =",out$n1,", n2 =",out$n2,")")
+      #   yup = wald.up
+      # }
+
+
+      legend.label = c("Rejection Threshold","Acceptance Threshold",
+                       "Likelihood ratio","Termination Threshold")
+
+
+      # plot.df = data.frame(xcol = seq(length(batch1.seq)), ycol = upper.threshold, group = rep("a",length(batch1.seq)))
+      # plot.df = rbind.data.frame(plot.df, data.frame(xcol = seq(length(batch1.seq)), ycol = lower.threshold,
+      #                                                group = rep("b",length(batch1.seq))))
+      # # plot.df = rbind.data.frame(plot.df, data.frame(xcol = seq(stage), ycol = LR.seq, group = rep("c",stage)))
+      # plot.df = rbind.data.frame(plot.df, data.frame(xcol = seq(length(LR.seq)), ycol = LR.seq, group = rep("c",stage)))
+      # plot.df = rbind.data.frame(plot.df, data.frame(xcol = length(batch1.seq), ycol = term.thresh, group="s"))
+      # 
+      # p = ggplot( plot.df, aes_string(x="xcol", y="ycol", color="group")) +
+      #   scale_color_manual(labels=legend.label, values=c("firebrick1","chartreuse4","dodgerblue1","black")) +
+      #   geom_segment(aes(x = length(batch1.seq), y = wald.low, xend = length(batch1.seq), yend = term.thresh),
+      #                color="chartreuse4", size=1.1) +
+      #   geom_segment(aes(x = length(batch1.seq), y = wald.up, xend = length(batch1.seq), yend = term.thresh),
+      #                color="firebrick1", size=1.1) +
+      #   geom_point( size = 3) +
+      #   geom_line(size=1.1) +
+      #   theme(plot.title = element_text(size=14, face="bold"),
+      #         axis.title.x = element_text(size=14, face="bold"),
+      #         axis.title.y = element_text(size=14, face="bold"),legend.title=element_blank(),
+      #         panel.background = element_rect(fill = "ivory2", colour = "ivory2"),
+      #         legend.background = element_rect(fill="lightblue", size=0.5, linetype="solid", colour ="darkblue")) +
+      #   guides(colour = guide_legend(override.aes = list(linetype=c(1,1,1,0), shape=16))) +
+      #   ggtitle(plot.title) +
+      #   xlab("Comparison stages") + ylab(ylabname) +
+      #   ylim(ylow,yup)
+      
+      
+      if( (out$decision=="accept") && (out$exit.stage<length(batch1.seq)) ){
         plot.title= paste(testname,": Accept Null (n1 =",out$n1,", n2 =",out$n2,")")
+        ylow = min(LR.seq)
         yup = max(LR.seq)
+      }else if( (out$decision=="accept") && (out$exit.stage==length(batch1.seq)) ){
+        plot.title= paste(testname,": Accept Null (n1 =",out$n1,", n2 =",out$n2,")")
+        ylow = 0
+        yup = wald.up
       }else if( (out$decision=="reject") && (out$exit.stage<length(batch1.seq)) ){
         plot.title= paste(testname,": Reject Null (n1 =",out$n1,", n2 =",out$n2,")")
+        ylow = 0
         yup = max(LR.seq)
       }else if( (out$decision=="reject") && (out$exit.stage==length(batch1.seq)) ){
         plot.title= paste(testname,": Reject Null (n1 =",out$n1,", n2 =",out$n2,")")
+        ylow = 0
         yup = wald.up
       }else if(out$decision=="continue"){
         plot.title= paste(testname,": Continue sampling (n1 =",out$n1,", n2 =",out$n2,")")
+        ylow = 0
         yup = wald.up
       }
-
-
-      legend.label = c("Rejection Threshold","Acceptance Threshold","Likelihood ratio","Termination Threshold")
-
-
-      plot.df = data.frame(xcol = seq(length(batch1.seq)), ycol = upper.threshold, group = rep("a",length(batch1.seq)))
-      plot.df = rbind.data.frame(plot.df, data.frame(xcol = seq(length(batch1.seq)), ycol = lower.threshold,
-                                                     group = rep("b",length(batch1.seq))))
-      plot.df = rbind.data.frame(plot.df, data.frame(xcol = seq(stage), ycol = LR.seq, group = rep("c",stage)))
-      plot.df = rbind.data.frame(plot.df, data.frame(xcol = length(batch1.seq), ycol = term.thresh, group="s"))
-
+      
+      plot.df = data.frame(xcol=batch1.seq,ycol=upper.threshold,group=rep("a",length(batch1.seq)))
+      plot.df = rbind.data.frame(plot.df,data.frame(xcol=batch1.seq,ycol=lower.threshold,group=rep("b",length(batch1.seq))))
+      plot.df = rbind.data.frame(plot.df,data.frame(xcol=batch1.seq[1:stage],ycol=LR.seq,group=rep("c",stage)))
+      plot.df = rbind.data.frame(plot.df,data.frame(xcol=batch1.seq[length(batch1.seq)],ycol=term.thresh,group="s"))
+      
       p = ggplot( plot.df, aes_string(x="xcol", y="ycol", color="group")) +
         scale_color_manual(labels=legend.label, values=c("firebrick1","chartreuse4","dodgerblue1","black")) +
-        geom_segment(aes(x = length(batch1.seq), y = wald.low, xend = length(batch1.seq), yend = term.thresh),
-                     color="chartreuse4", size=1.1) +
-        geom_segment(aes(x = length(batch1.seq), y = wald.up, xend = length(batch1.seq), yend = term.thresh),
-                     color="firebrick1", size=1.1) +
+        geom_segment(aes(x = batch1.seq[length(batch1.seq)], y = wald.low,
+                         xend = batch1.seq[length(batch1.seq)], yend = term.thresh), color="chartreuse4", size=1.1) +
+        geom_segment(aes(x = batch1.seq[length(batch1.seq)], y = wald.up,
+                         xend = batch1.seq[length(batch1.seq)], yend = term.thresh), color="firebrick1", size=1.1) +
         geom_point( size = 3) +
         geom_line(size=1.1) +
         theme(plot.title = element_text(size=14, face="bold"),
@@ -4756,7 +5170,7 @@ implement.MSPRT = function( test.type, obs, obs1, obs2, side, batch.seq, batch1.
               legend.background = element_rect(fill="lightblue", size=0.5, linetype="solid", colour ="darkblue")) +
         guides(colour = guide_legend(override.aes = list(linetype=c(1,1,1,0), shape=16))) +
         ggtitle(plot.title) +
-        xlab("Comparison stages") + ylab(ylabname) +
+        xlab("Sample size") + ylab(ylabname) +
         ylim(ylow,yup)
 
       suppressWarnings(print(p))
@@ -4796,11 +5210,7 @@ OC.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq, null, t
 
   ## proptest
   if(test.type=="oneProp"){
-
-    # checking if N.max is provided
-    if(missing(N.max)==T){
-      return("Maximum budget on sample size is not provided")
-    }
+    
     
     # ignoring batch1.seq & batch2.seq
     if(missing(batch1.seq)==F) print("'batch1.seq' is ignored. Not required in a one-sample test.")
@@ -4814,9 +5224,19 @@ OC.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq, null, t
     
     ## msg
     if(verbose==T){
-      print("-------------------------------------------------------------------------")
-      print("MSPRT in case of a one-sample binomial proportion test:")
-      print("-------------------------------------------------------------------------")
+      
+      if((missing(batch.seq)==F) && (sum(batch.seq!=1)>0)){
+        
+        print("-------------------------------------------------------------------------")
+        print("The group sequential MSPRT in case of a one-sample proportion test:")
+        print("-------------------------------------------------------------------------")
+        
+      }else{
+        
+        print("-------------------------------------------------------------------------")
+        print("The MSPRT in case of a one-sample proportion test:")
+        print("-------------------------------------------------------------------------")
+      }
     }
 
 
@@ -4837,7 +5257,49 @@ OC.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq, null, t
         print(paste("Working with side = ",side," (user specified)", sep = ""))
       }
     }
-
+    
+    
+    #default batch sequence and N.max
+    if(missing(batch.seq)==T){
+      
+      if(missing(N.max)==T){
+        return("Error! Need to specify at least batch.seq (batch sizes) or N.max (Maximum available sample size)")
+      }else{
+        
+        batch.seq = 1:N.max
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N.max = ", N.max, sep = ""))
+          print(paste("             batch.seq = ", 1, ":N.max (default)", sep = ""))
+        }
+      }
+      
+    }else{
+      
+      if(missing(N.max)==T){
+        
+        N.max = sum(batch.seq)
+        ## msg
+        if(verbose==T){
+          print(paste("             N.max = ", N.max, sep = ""))
+          print("             batch.seq (user specified)")
+        }
+        
+      }else{
+        
+        if(sum(batch.seq)!=N.max) return("Error! Sum of batch sizes should add up to N.max")
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N.max = ", N.max, sep = ""))
+          print("             batch.seq (user specified)")
+        }
+      }
+      
+      batch.seq = cumsum(batch.seq)
+    }
+    
 
     # type1
     if(missing(type1)==T){
@@ -4869,24 +5331,7 @@ OC.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq, null, t
         print(paste("             type2 = ",type2," (user specified)", sep = ""))
       }
     }
-
-
-    # batch sequence
-    if(missing(batch.seq)==T){
-
-      batch.seq = 1:N.max
-
-      ## msg
-      if(verbose==T){
-        print(paste("             batch.seq = ",1,":N.max (default)", sep = ""))
-      }
-    }else{
-
-      ##msg
-      if(verbose==T){
-        print("             batch.seq (user specified)")
-      }
-    }
+    
 
     # setting default null
     if(missing(null)==T){
@@ -4928,7 +5373,7 @@ OC.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq, null, t
         repl = 2e+6
       }else{repl = 1e+6}
     }else{repl = repl}
-    k.dec = floor(log(sqrt(repl)))
+    # k.dec = floor(log(sqrt(repl)))
 
     # default number of cores
     if(missing(core.no)==T){
@@ -5007,13 +5452,19 @@ OC.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq, null, t
       vec = inc[!is.na(inc)]
 
       overshoot.summ = list("count" = sum(as.numeric(out[[1]])), "inconclusive.vec" = vec, "n.vec"=as.numeric(out[[3]]))
+      
+      # k.dec=1
+      # while(type1!=round(type1,k.dec)){
+      #   k.dec = k.dec+1
+      # }
+      # k.dec = k.dec+1
+      
+      type1.est = error.summary( error.type = "type1", delta= term.thresh, root = 0,
+                                 count= overshoot.summ$count,
+                                 inconclusive.vec= overshoot.summ$inconclusive.vec, 
+                                 R= repl, type1 = type1)
 
-      type1.est = error.summary( error.type = "type1", delta= term.thresh, root = 0, count= overshoot.summ$count,
-                                 inconclusive.vec= overshoot.summ$inconclusive.vec, R= repl, type1 = type1)
-
-      var.n0 = var(overshoot.summ$n.vec)
-      k.dec.n0 = abs(ceiling(log10(sqrt(var.n0/repl))))
-      avg.n0 = floor(mean(overshoot.summ$n.vec)*10^k.dec.n0)/(10^k.dec.n0)
+      avg.n0 = floor(mean(overshoot.summ$n.vec)*100)/100
 
       out = list("type1.est"= type1.est, "avg.n0"= avg.n0, "n0.vec" = overshoot.summ$n.vec)
 
@@ -5056,12 +5507,12 @@ OC.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq, null, t
 
       overshoot.summ = list("count" = sum(as.numeric(out[[1]])), "inconclusive.vec" = vec, "n.vec"=as.numeric(out[[3]]))
 
-      type2.est = error.summary( error.type = "type2", delta= term.thresh, root = 0, count= overshoot.summ$count,
-                                 inconclusive.vec= overshoot.summ$inconclusive.vec, R= repl, type2 = type2)
+      type2.est = error.summary( error.type = "type2", delta= term.thresh, root = 0, 
+                                 count= overshoot.summ$count,
+                                 inconclusive.vec= overshoot.summ$inconclusive.vec, 
+                                 R= repl, type2 = type2)
 
-      var.n1 = var(overshoot.summ$n.vec)
-      k.dec.n1 = abs(ceiling(log10(sqrt(var.n1/repl))))
-      avg.n1 = floor(mean(overshoot.summ$n.vec)*10^k.dec.n1)/(10^k.dec.n1)
+      avg.n1 = floor(mean(overshoot.summ$n.vec)*100)/100
 
       out = list("type2.est"=type2.est, "avg.n1"=avg.n1, "n1.vec" = overshoot.summ$n.vec)
 
@@ -5077,11 +5528,7 @@ OC.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq, null, t
 
   ## z test
   if(test.type=="oneZ"){
-
-    # checking if N.max is provided
-    if(missing(N.max)==T){
-      return("Maximum budget on sample size is not provided")
-    }
+    
     
     # ignoring batch1.seq & batch2.seq
     if(missing(batch1.seq)==F) print("'batch1.seq' is ignored. Not required in a one-sample test.")
@@ -5095,9 +5542,19 @@ OC.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq, null, t
     
     ## msg
     if(verbose==T){
-      print("-------------------------------------------------------------------------")
-      print("MSPRT in case of a one-sample Z-test:")
-      print("-------------------------------------------------------------------------")
+      
+      if((missing(batch.seq)==F) && (sum(batch.seq!=1)>0)){
+        
+        print("-------------------------------------------------------------------------")
+        print("The group sequential MSPRT in case of a one-sample Z-test:")
+        print("-------------------------------------------------------------------------")
+        
+      }else{
+        
+        print("-------------------------------------------------------------------------")
+        print("The MSPRT in case of a one-sample Z-test:")
+        print("-------------------------------------------------------------------------")
+      }
     }
 
 
@@ -5118,7 +5575,49 @@ OC.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq, null, t
         print(paste("Working with side = ",side," (user specified)", sep = ""))
       }
     }
-
+    
+    
+    #default batch sequence and N.max
+    if(missing(batch.seq)==T){
+      
+      if(missing(N.max)==T){
+        return("Error! Need to specify at least batch.seq (batch sizes) or N.max (Maximum available sample size)")
+      }else{
+        
+        batch.seq = 1:N.max
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N.max = ", N.max, sep = ""))
+          print(paste("             batch.seq = ", 1, ":N.max (default)", sep = ""))
+        }
+      }
+      
+    }else{
+      
+      if(missing(N.max)==T){
+        
+        N.max = sum(batch.seq)
+        ## msg
+        if(verbose==T){
+          print(paste("             N.max = ", N.max, sep = ""))
+          print("             batch.seq (user specified)")
+        }
+        
+      }else{
+        
+        if(sum(batch.seq)!=N.max) return("Error! Sum of batch sizes should add up to N.max")
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N.max = ", N.max, sep = ""))
+          print("             batch.seq (user specified)")
+        }
+      }
+      
+      batch.seq = cumsum(batch.seq)
+    }
+    
 
     # type1
     if(missing(type1)==T){
@@ -5150,24 +5649,7 @@ OC.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq, null, t
         print(paste("             type2 = ",type2," (user specified)", sep = ""))
       }
     }
-
-
-    # batch sequence
-    if(missing(batch.seq)==T){
-
-      batch.seq = 1:N.max
-
-      ## msg
-      if(verbose==T){
-        print(paste("             batch.seq = ",1,":N.max (default)", sep = ""))
-      }
-    }else{
-
-      ##msg
-      if(verbose==T){
-        print("             batch.seq (user specified)")
-      }
-    }
+    
 
     # setting default null
     if(missing(null)==T){
@@ -5224,7 +5706,7 @@ OC.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq, null, t
         repl = 2e+6
       }else{repl = 1e+6}
     }else{repl = repl}
-    k.dec = floor(log(sqrt(repl)))
+    # k.dec = floor(log(sqrt(repl)))
 
     # default number of cores
     if(missing(core.no)==T){
@@ -5297,13 +5779,19 @@ OC.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq, null, t
       vec = c(vec,inc[!is.na(inc)])
 
       overshoot.summ = list("count" = sum(as.numeric(out[[1]])), "inconclusive.vec" = vec, "n.vec"=as.numeric(out[[3]]))
-
-      type1.est = error.summary( error.type = "type1", delta= term.thresh, root = 0, count= overshoot.summ$count,
-                                 inconclusive.vec= overshoot.summ$inconclusive.vec, R= repl, type1 = type1)
-
-      var.n0 = var(overshoot.summ$n.vec)
-      k.dec.n0 = abs(ceiling(log10(sqrt(var.n0/repl))))
-      avg.n0 = floor(mean(overshoot.summ$n.vec)*10^k.dec.n0)/(10^k.dec.n0)
+      
+      # k.dec=1
+      # while(type1!=round(type1,k.dec)){
+      #   k.dec = k.dec+1
+      # }
+      # k.dec = k.dec+1
+      
+      type1.est = error.summary( error.type = "type1", delta= term.thresh, root = 0,
+                                 count= overshoot.summ$count,
+                                 inconclusive.vec= overshoot.summ$inconclusive.vec, 
+                                 R= repl, type1 = type1)
+      
+      avg.n0 = floor(mean(overshoot.summ$n.vec)*100)/100
 
       out = list("type1.est"= type1.est, "avg.n0"= avg.n0, "n0.vec" = overshoot.summ$n.vec)
 
@@ -5346,12 +5834,12 @@ OC.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq, null, t
 
       overshoot.summ = list("count" = sum(as.numeric(out[[1]])), "inconclusive.vec" = vec, "n.vec"=as.numeric(out[[3]]))
 
-      type2.est = error.summary( error.type = "type2", delta= term.thresh, root = 0, count= overshoot.summ$count,
-                                 inconclusive.vec= overshoot.summ$inconclusive.vec, R= repl, type2 = type2)
-
-      var.n1 = var(overshoot.summ$n.vec)
-      k.dec.n1 = abs(ceiling(log10(sqrt(var.n1/repl))))
-      avg.n1 = floor(mean(overshoot.summ$n.vec)*10^k.dec.n1)/(10^k.dec.n1)
+      type2.est = error.summary( error.type = "type2", delta= term.thresh, root = 0, 
+                                 count= overshoot.summ$count,
+                                 inconclusive.vec= overshoot.summ$inconclusive.vec, 
+                                 R= repl, type2 = type2)
+      
+      avg.n1 = floor(mean(overshoot.summ$n.vec)*100)/100
 
       out = list("type2.est"=type2.est, "avg.n1"=avg.n1, "n1.vec" = overshoot.summ$n.vec)
 
@@ -5368,11 +5856,7 @@ OC.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq, null, t
 
   ## t test
   if(test.type=="oneT"){
-
-    # checking if N.max is provided
-    if(missing(N.max)==T){
-      return("Maximum budget on sample size is not provided")
-    }
+    
     
     # ignoring batch1.seq & batch2.seq
     if(missing(batch1.seq)==F) print("'batch1.seq' is ignored. Not required in a one-sample test.")
@@ -5383,11 +5867,22 @@ OC.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq, null, t
     if(missing(N2.max)==F) print("'N2.max' is ignored. Not required in a one-sample test.")
     
     
+    
     ## msg
     if(verbose==T){
-      print("-------------------------------------------------------------------------")
-      print("MSPRT in case of a one-sample T-test:")
-      print("-------------------------------------------------------------------------")
+      
+      if((missing(batch.seq)==F) && (sum(batch.seq[-1]!=1)>0)){
+        
+        print("-------------------------------------------------------------------------")
+        print("The group sequential MSPRT in case of a one-sample T-test:")
+        print("-------------------------------------------------------------------------")
+        
+      }else{
+        
+        print("-------------------------------------------------------------------------")
+        print("The MSPRT in case of a one-sample T-test:")
+        print("-------------------------------------------------------------------------")
+      }
     }
 
 
@@ -5408,7 +5903,51 @@ OC.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq, null, t
         print(paste("Working with side = ",side," (user specified)", sep = ""))
       }
     }
-
+    
+    
+    #default batch sequence and N.max
+    if(missing(batch.seq)==T){
+      
+      if(missing(N.max)==T){
+        return("Error! Need to specify at least batch.seq (batch sizes) or N.max (Maximum available sample size)")
+      }else{
+        
+        batch.seq = 2:N.max
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N.max = ", N.max, sep = ""))
+          print(paste("             batch.seq = ", 2, ":N.max (default)", sep = ""))
+        }
+      }
+      
+    }else{
+      
+      if(batch.seq[1]<2) return("Error! First batch size should be at least 2")
+      
+      if(missing(N.max)==T){
+        
+        N.max = sum(batch.seq)
+        ## msg
+        if(verbose==T){
+          print(paste("             N.max = ", N.max, sep = ""))
+          print("             batch.seq (user specified)")
+        }
+        
+      }else{
+        
+        if(sum(batch.seq)!=N.max) return("Error! Sum of batch sizes should add up to N.max")
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N.max = ", N.max, sep = ""))
+          print("             batch.seq (user specified)")
+        }
+      }
+      
+      batch.seq = cumsum(batch.seq)
+    }
+    
 
     # type1
     if(missing(type1)==T){
@@ -5438,29 +5977,6 @@ OC.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq, null, t
       ## msg
       if(verbose==T){
         print(paste("             type2 = ",type2," (user specified)", sep = ""))
-      }
-    }
-
-
-    # batch sequence
-    if(missing(batch.seq)==T){
-
-      batch.seq = 2:N.max
-
-      ## msg
-      if(verbose==T){
-        print(paste("             batch.seq = ",2,":N.max (default)", sep = ""))
-      }
-    }else{
-
-      if(batch.seq[1]<2){
-        return("batch.seq[1]<2. Need at least 2 samples to compute sample standard deviation")
-      }else{
-
-        ##msg
-        if(verbose==T){
-          print("             batch.seq (user specified)")
-        }
       }
     }
 
@@ -5507,7 +6023,7 @@ OC.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq, null, t
         repl = 2e+6
       }else{repl = 1e+6}
     }else{repl = repl}
-    k.dec = floor(log(sqrt(repl)))
+    # k.dec = floor(log(sqrt(repl)))
 
     # default number of cores
     if(missing(core.no)==T){
@@ -5565,18 +6081,18 @@ OC.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq, null, t
       vec = c(vec,inc[!is.na(inc)])
 
       overshoot.summ = list("count" = sum(as.numeric(out[[1]])), "inconclusive.vec" = vec, "n.vec"=as.numeric(out[[3]]))
-
-      ## msg
-      if(verbose==T){
-        print("The UMPBT alternatives has been obtained")
-      }
-
-      type1.est = error.summary( error.type = "type1", delta= term.thresh, root = 0, count= overshoot.summ$count,
-                                 inconclusive.vec= overshoot.summ$inconclusive.vec, R= repl, type1 = type1)
-
-      var.n0 = var(overshoot.summ$n.vec)
-      k.dec.n0 = abs(ceiling(log10(sqrt(var.n0/repl))))
-      avg.n0 = floor(mean(overshoot.summ$n.vec)*10^k.dec.n0)/(10^k.dec.n0)
+      # k.dec=1
+      # while(type1!=round(type1,k.dec)){
+      #   k.dec = k.dec+1
+      # }
+      # k.dec = k.dec+1
+      
+      type1.est = error.summary( error.type = "type1", delta= term.thresh, root = 0,
+                                 count= overshoot.summ$count,
+                                 inconclusive.vec= overshoot.summ$inconclusive.vec, 
+                                 R= repl, type1 = type1)
+      
+      avg.n0 = floor(mean(overshoot.summ$n.vec)*100)/100
 
       out = list("type1.est"= type1.est, "avg.n0"= avg.n0, "n0.vec" = overshoot.summ$n.vec)
 
@@ -5619,12 +6135,12 @@ OC.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq, null, t
 
       overshoot.summ = list("count" = sum(as.numeric(out[[1]])), "inconclusive.vec" = vec, "n.vec"=as.numeric(out[[3]]))
 
-      type2.est = error.summary( error.type = "type2", delta= term.thresh, root = 0, count= overshoot.summ$count,
-                                 inconclusive.vec= overshoot.summ$inconclusive.vec, R= repl, type2 = type2)
-
-      var.n1 = var(overshoot.summ$n.vec)
-      k.dec.n1 = abs(ceiling(log10(sqrt(var.n1/repl))))
-      avg.n1 = floor(mean(overshoot.summ$n.vec)*10^k.dec.n1)/(10^k.dec.n1)
+      type2.est = error.summary( error.type = "type2", delta= term.thresh, root = 0, 
+                                 count= overshoot.summ$count,
+                                 inconclusive.vec= overshoot.summ$inconclusive.vec, 
+                                 R= repl, type2 = type2)
+      
+      avg.n1 = floor(mean(overshoot.summ$n.vec)*100)/100
 
       out = list("type2.est"=type2.est, "avg.n1"=avg.n1, "n1.vec" = overshoot.summ$n.vec)
 
@@ -5640,16 +6156,7 @@ OC.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq, null, t
 
   ## two sample z test
   if(test.type=="twoZ"){
-
-    # checking if N1.max is provided
-    if(missing(N1.max)==T){
-      return("Maximum budget on sample size for Group-1 is not provided")
-    }
-
-    # checking if N2.max is provided
-    if(missing(N2.max)==T){
-      return("Maximum budget on sample size for Group-2 is not provided")
-    }
+    
 
     # checking if length(batch1.seq) and length(batch2.seq) are equal
     if( (missing(batch1.seq)==F) && (missing(batch2.seq)==F) && (length(batch1.seq)!=length(batch2.seq)) ){
@@ -5669,9 +6176,19 @@ OC.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq, null, t
     
     ## msg
     if(verbose==T){
-      print("-------------------------------------------------------------------------")
-      print("MSPRT in case of a two-sample Z-test:")
-      print("-------------------------------------------------------------------------")
+      
+      if(((missing(batch1.seq)==F) && (sum(batch1.seq[-1]!=1)>0))||((missing(batch2.seq)==F) && (sum(batch2.seq[-1]!=1)>0))){
+        
+        print("-------------------------------------------------------------------------")
+        print("The group sequential MSPRT in case of a two-sample Z-test:")
+        print("-------------------------------------------------------------------------")
+        
+      }else{
+        
+        print("-------------------------------------------------------------------------")
+        print("The MSPRT in case of a two-sample Z-test:")
+        print("-------------------------------------------------------------------------")
+      }
     }
 
 
@@ -5692,6 +6209,91 @@ OC.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq, null, t
         print(paste("Working with side = ",side," (user specified)", sep = ""))
       }
     }
+    
+    
+    #default batch1 sequence and N1.max
+    if(missing(batch1.seq)==T){
+      
+      if(missing(N1.max)==T){
+        return("Error! Need to specify at least batch1.seq (batch sizes for Group-1) or N1.max (Maximum available sample size for Group-1)")
+      }else{
+        
+        batch1.seq = 1:N1.max
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N1.max = ", N1.max, sep = ""))
+          print(paste("             batch1.seq = ", 1, ":N1.max (default)", sep = ""))
+        }
+      }
+      
+    }else{
+      
+      if(missing(N1.max)==T){
+        
+        N1.max = sum(batch1.seq)
+        ## msg
+        if(verbose==T){
+          print(paste("             N1.max = ", N1.max, sep = ""))
+          print("             batch1.seq (user specified)")
+        }
+        
+      }else{
+        
+        if(sum(batch1.seq)!=N1.max) return("Error! Sum of batch sizes for Group-1 should add up to N1.max")
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N1.max = ", N1.max, sep = ""))
+          print("             batch1.seq (user specified)")
+        }
+      }
+      
+      batch1.seq = cumsum(batch1.seq)
+    }
+    
+    
+    #default batch2 sequence and N2.max
+    if(missing(batch2.seq)==T){
+      
+      if(missing(N2.max)==T){
+        return("Error! Need to specify at least batch2.seq (batch sizes for Group-2) or N2.max (Maximum available sample size for Group-2)")
+      }else{
+        
+        batch2.seq = 1:N2.max
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N2.max = ", N2.max, sep = ""))
+          print(paste("             batch2.seq = ", 1, ":N2.max (default)", sep = ""))
+        }
+      }
+      
+    }else{
+      
+      if(missing(N2.max)==T){
+        
+        N2.max = sum(batch2.seq)
+        ## msg
+        if(verbose==T){
+          print(paste("             N2.max = ", N2.max, sep = ""))
+          print("             batch2.seq (user specified)")
+        }
+        
+      }else{
+        
+        if(sum(batch2.seq)!=N2.max) return("Error! Sum of batch sizes for Group-2 should add up to N2.max")
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N2.max = ", N2.max, sep = ""))
+          print("             batch2.seq (user specified)")
+        }
+      }
+      
+      batch2.seq = cumsum(batch2.seq)
+    }
+    
 
 
     # type1
@@ -5722,40 +6324,6 @@ OC.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq, null, t
       ## msg
       if(verbose==T){
         print(paste("             type2 = ",type2," (user specified)", sep = ""))
-      }
-    }
-
-
-    # batch sequence
-    if(missing(batch1.seq)==T){
-
-      batch1.seq = 1:N1.max
-
-      ## msg
-      if(verbose==T){
-        print(paste("             batch1.seq = ",1,":N1.max (default)", sep = ""))
-      }
-    }else{
-
-      ##msg
-      if(verbose==T){
-        print("             batch1.seq (user specified)")
-      }
-    }
-
-    if(missing(batch2.seq)==T){
-
-      batch2.seq = 1:N2.max
-
-      ## msg
-      if(verbose==T){
-        print(paste("             batch2.seq = ",1,":N2.max (default)", sep = ""))
-      }
-    }else{
-
-      ##msg
-      if(verbose==T){
-        print("             batch2.seq (user specified)")
       }
     }
 
@@ -5804,7 +6372,7 @@ OC.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq, null, t
         repl = 2e+6
       }else{repl = 1e+6}
     }else{repl = repl}
-    k.dec = floor(log(sqrt(repl)))
+    # k.dec = floor(log(sqrt(repl)))
 
     # default number of cores
     if(missing(core.no)==T){
@@ -5878,18 +6446,19 @@ OC.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq, null, t
 
       overshoot.summ = list("count" = sum(as.numeric(out[[1]])), "inconclusive.vec" = vec,
                             "n1.vec"=as.numeric(out[[3]]), "n2.vec"=as.numeric(out[[4]]) )
+      # k.dec=1
+      # while(type1!=round(type1,k.dec)){
+      #   k.dec = k.dec+1
+      # }
+      # k.dec = k.dec+1
+      
+      type1.est = error.summary( error.type = "type1", delta= term.thresh, root = 0,
+                                 count= overshoot.summ$count,
+                                 inconclusive.vec= overshoot.summ$inconclusive.vec, 
+                                 R= repl, type1 = type1)
 
-
-      type1.est = error.summary( error.type = "type1", delta= term.thresh, root = 0, count= overshoot.summ$count,
-                                 inconclusive.vec= overshoot.summ$inconclusive.vec, R= repl, type1 = type1)
-
-      var.n1_0 = var(overshoot.summ$n1.vec)
-      k.dec.n1_0 = abs(ceiling(log10(sqrt(var.n1_0/repl))))
-      avg.n1_0 = floor(mean(overshoot.summ$n1.vec)*10^k.dec.n1_0)/(10^k.dec.n1_0)
-
-      var.n2_0 = var(overshoot.summ$n2.vec)
-      k.dec.n2_0 = abs(ceiling(log10(sqrt(var.n2_0/repl))))
-      avg.n2_0 = floor(mean(overshoot.summ$n2.vec)*10^k.dec.n2_0)/(10^k.dec.n2_0)
+      avg.n1_0 = floor(mean(overshoot.summ$n1.vec)*100)/100
+      avg.n2_0 = floor(mean(overshoot.summ$n2.vec)*100)/100
 
       out = list("type1.est"= type1.est, "avg.n1_0"= avg.n1_0, "avg.n2_0"= avg.n2_0,
                  "n1_0.vec" = overshoot.summ$n1.vec, "n2_0.vec" = overshoot.summ$n2.vec)
@@ -5934,16 +6503,13 @@ OC.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq, null, t
       overshoot.summ = list("count" = sum(as.numeric(out[[1]])), "inconclusive.vec" = vec,
                             "n1.vec"=as.numeric(out[[3]]), "n2.vec"=as.numeric(out[[4]]) )
 
-      type2.est = error.summary( error.type = "type2", delta= term.thresh, root = 0, count= overshoot.summ$count,
-                                 inconclusive.vec= overshoot.summ$inconclusive.vec, R= repl, type2 = type2)
-
-      var.n1_1 = var(overshoot.summ$n1.vec)
-      k.dec.n1_1 = abs(ceiling(log10(sqrt(var.n1_1/repl))))
-      avg.n1_1 = floor(mean(overshoot.summ$n1.vec)*10^k.dec.n1_1)/(10^k.dec.n1_1)
-
-      var.n2_1 = var(overshoot.summ$n2.vec)
-      k.dec.n2_1 = abs(ceiling(log10(sqrt(var.n2_1/repl))))
-      avg.n2_1 = floor(mean(overshoot.summ$n2.vec)*10^k.dec.n2_1)/(10^k.dec.n2_1)
+      type2.est = error.summary( error.type = "type2", delta= term.thresh, root = 0, 
+                                 count= overshoot.summ$count,
+                                 inconclusive.vec= overshoot.summ$inconclusive.vec, 
+                                 R= repl, type2 = type2)
+      
+      avg.n1_1 = floor(mean(overshoot.summ$n1.vec)*100)/100
+      avg.n2_1 = floor(mean(overshoot.summ$n2.vec)*100)/100
 
       out = list("type2.est"= type2.est, "avg.n1_1"= avg.n1_1, "avg.n2_1"= avg.n2_1,
                  "n1_1.vec" = overshoot.summ$n1.vec, "n2_1.vec" = overshoot.summ$n2.vec)
@@ -5961,17 +6527,7 @@ OC.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq, null, t
 
   ## two sample t test
   if(test.type=="twoT"){
-
-    # checking if N1.max is provided
-    if(missing(N1.max)==T){
-      return("Maximum budget on sample size for Group-1 is not provided")
-    }
-
-    # checking if N2.max is provided
-    if(missing(N2.max)==T){
-      return("Maximum budget on sample size for Group-2 is not provided")
-    }
-
+    
     
     # checking if length(batch1.seq) and length(batch2.seq) are equal
     if( (missing(batch1.seq)==F) && (missing(batch2.seq)==F) && (length(batch1.seq)!=length(batch2.seq)) ){
@@ -5991,9 +6547,19 @@ OC.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq, null, t
     
     ## msg
     if(verbose==T){
-      print("-------------------------------------------------------------------------")
-      print("MSPRT in case of a two-sample T-test:")
-      print("-------------------------------------------------------------------------")
+      
+      if(((missing(batch1.seq)==F) && (sum(batch1.seq[-1]!=1)>0))||((missing(batch2.seq)==F) && (sum(batch2.seq[-1]!=1)>0))){
+        
+        print("-------------------------------------------------------------------------")
+        print("The group sequential MSPRT in case of a two-sample T-test:")
+        print("-------------------------------------------------------------------------")
+        
+      }else{
+        
+        print("-------------------------------------------------------------------------")
+        print("The MSPRT in case of a two-sample T-test:")
+        print("-------------------------------------------------------------------------")
+      }
     }
 
 
@@ -6014,7 +6580,94 @@ OC.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq, null, t
         print(paste("Working with side = ",side," (user specified)", sep = ""))
       }
     }
-
+    
+    
+    #default batch1 sequence and N1.max
+    if(missing(batch1.seq)==T){
+      
+      if(missing(N1.max)==T){
+        return("Error! Need to specify at least batch1.seq (batch sizes for Group-1) or N1.max (Maximum available sample size for Group-1)")
+      }else{
+        
+        batch1.seq = 2:N1.max
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N1.max = ", N1.max, sep = ""))
+          print(paste("             batch1.seq = ", 2, ":N1.max (default)", sep = ""))
+        }
+      }
+      
+    }else{
+      
+      if(batch1.seq[1]<2) return("Error! First batch size for Group-1 should be at least 2")
+      
+      if(missing(N1.max)==T){
+        
+        N1.max = sum(batch1.seq)
+        ## msg
+        if(verbose==T){
+          print(paste("             N1.max = ", N1.max, sep = ""))
+          print("             batch1.seq (user specified)")
+        }
+        
+      }else{
+        
+        if(sum(batch1.seq)!=N1.max) return("Error! Sum of batch sizes for Group-1 should add up to N1.max")
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N1.max = ", N1.max, sep = ""))
+          print("             batch1.seq (user specified)")
+        }
+      }
+      
+      batch1.seq = cumsum(batch1.seq)
+    }
+    
+    
+    #default batch2 sequence and N2.max
+    if(missing(batch2.seq)==T){
+      
+      if(missing(N2.max)==T){
+        return("Error! Need to specify at least batch2.seq (batch sizes for Group-2) or N2.max (Maximum available sample size for Group-2)")
+      }else{
+        
+        batch2.seq = 2:N2.max
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N2.max = ", N2.max, sep = ""))
+          print(paste("             batch2.seq = ", 2, ":N2.max (default)", sep = ""))
+        }
+      }
+      
+    }else{
+      
+      if(batch2.seq[1]<2) return("Error! First batch size for Group-2 should be at least 2")
+      
+      if(missing(N2.max)==T){
+        
+        N2.max = sum(batch2.seq)
+        ## msg
+        if(verbose==T){
+          print(paste("             N2.max = ", N2.max, sep = ""))
+          print("             batch2.seq (user specified)")
+        }
+        
+      }else{
+        
+        if(sum(batch2.seq)!=N2.max) return("Error! Sum of batch sizes for Group-2 should add up to N2.max")
+        
+        ## msg
+        if(verbose==T){
+          print(paste("             N2.max = ", N2.max, sep = ""))
+          print("             batch2.seq (user specified)")
+        }
+      }
+      
+      batch2.seq = cumsum(batch2.seq)
+    }
 
     # type1
     if(missing(type1)==T){
@@ -6046,43 +6699,7 @@ OC.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq, null, t
         print(paste("             type2 = ",type2," (user specified)", sep = ""))
       }
     }
-
-
-    # default batch sequence
-    if( (missing(batch1.seq)==F) && (missing(batch2.seq)==F) ){
-
-      if(batch1.seq[1]<2){
-        return("batch1.seq[1]<2. Need at least 2 samples to compute the pooled sample standard deviation")
-      }
-      if(batch2.seq[1]<2){
-        return("batch2.seq[1]<2. Need at least 2 samples to compute the pooled sample standard deviation")
-      }
-      if( (batch2.seq[1]>1)&&(batch2.seq[1]>1) ){
-
-        ##msg
-        if(verbose==T){
-          print("             batch1.seq and batch2.seq (user specified)")
-        }
-      }
-    }
-    if(missing(batch1.seq)==T){
-
-      batch1.seq = 2:N1.max
-
-      ## msg
-      if(verbose==T){
-        print(paste("             batch1.seq = ",2,":N1.max (default)", sep = ""))
-      }
-    }
-    if(missing(batch2.seq)==T){
-
-      batch2.seq = 2:N2.max
-
-      ## msg
-      if(verbose==T){
-        print(paste("             batch1.seq = ",2,":N2.max (default)", sep = ""))
-      }
-    }
+    
 
 
     # null
@@ -6117,7 +6734,7 @@ OC.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq, null, t
         repl = 2e+6
       }else{repl = 1e+6}
     }else{repl = repl}
-    k.dec = floor(log(sqrt(repl)))
+    # k.dec = floor(log(sqrt(repl)))
 
     # default number of cores
     if(missing(core.no)==T){
@@ -6181,17 +6798,19 @@ OC.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq, null, t
       overshoot.summ = list("count" = sum(as.numeric(out[[1]])), "inconclusive.vec" = vec,
                             "n1.vec"=as.numeric(out[[3]]), "n2.vec"=as.numeric(out[[4]]) )
 
-
-      type1.est = error.summary( error.type = "type1", delta= term.thresh, root = 0, count= overshoot.summ$count,
-                                 inconclusive.vec= overshoot.summ$inconclusive.vec, R= repl, type1 = type1)
-
-      var.n1_0 = var(overshoot.summ$n1.vec)
-      k.dec.n1_0 = abs(ceiling(log10(sqrt(var.n1_0/repl))))
-      avg.n1_0 = floor(mean(overshoot.summ$n1.vec)*10^k.dec.n1_0)/(10^k.dec.n1_0)
-
-      var.n2_0 = var(overshoot.summ$n2.vec)
-      k.dec.n2_0 = abs(ceiling(log10(sqrt(var.n2_0/repl))))
-      avg.n2_0 = floor(mean(overshoot.summ$n2.vec)*10^k.dec.n2_0)/(10^k.dec.n2_0)
+      # k.dec=1
+      # while(type1!=round(type1,k.dec)){
+      #   k.dec = k.dec+1
+      # }
+      # k.dec = k.dec+1
+      
+      type1.est = error.summary( error.type = "type1", delta= term.thresh, root = 0,
+                                 count= overshoot.summ$count,
+                                 inconclusive.vec= overshoot.summ$inconclusive.vec, 
+                                 R= repl, type1 = type1)
+      
+      avg.n1_0 = floor(mean(overshoot.summ$n1.vec)*100)/100
+      avg.n2_0 = floor(mean(overshoot.summ$n2.vec)*100)/100
 
       out = list("type1.est"= type1.est, "avg.n1_0"= avg.n1_0, "avg.n2_0"= avg.n2_0,
                  "n1_0.vec" = overshoot.summ$n1.vec, "n2_0.vec" = overshoot.summ$n2.vec)
@@ -6237,16 +6856,13 @@ OC.MSPRT = function( test.type, side, batch.seq, batch1.seq, batch2.seq, null, t
       overshoot.summ = list("count" = sum(as.numeric(out[[1]])), "inconclusive.vec" = vec,
                             "n1.vec"=as.numeric(out[[3]]), "n2.vec"=as.numeric(out[[4]]) )
 
-      type2.est = error.summary( error.type = "type2", delta= term.thresh, root = 0, count= overshoot.summ$count,
-                                 inconclusive.vec= overshoot.summ$inconclusive.vec, R= repl, type2 = type2)
-
-      var.n1_1 = var(overshoot.summ$n1.vec)
-      k.dec.n1_1 = abs(ceiling(log10(sqrt(var.n1_1/repl))))
-      avg.n1_1 = floor(mean(overshoot.summ$n1.vec)*10^k.dec.n1_1)/(10^k.dec.n1_1)
-
-      var.n2_1 = var(overshoot.summ$n2.vec)
-      k.dec.n2_1 = abs(ceiling(log10(sqrt(var.n2_1/repl))))
-      avg.n2_1 = floor(mean(overshoot.summ$n2.vec)*10^k.dec.n2_1)/(10^k.dec.n2_1)
+      type2.est = error.summary( error.type = "type2", delta= term.thresh, root = 0, 
+                                 count= overshoot.summ$count,
+                                 inconclusive.vec= overshoot.summ$inconclusive.vec, 
+                                 R= repl, type2 = type2)
+      
+      avg.n1_1 = floor(mean(overshoot.summ$n1.vec)*100)/100
+      avg.n2_1 = floor(mean(overshoot.summ$n2.vec)*100)/100
 
       out = list("type2.est"= type2.est, "avg.n1_1"= avg.n1_1, "avg.n2_1"= avg.n2_1,
                  "n1_1.vec" = overshoot.summ$n1.vec, "n2_1.vec" = overshoot.summ$n2.vec)

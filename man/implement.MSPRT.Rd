@@ -53,31 +53,19 @@ Has to be one of \code{"right"} or \code{"left"}.
 \strong{Default:} \code{"right"}.
 }
   \item{batch.seq}{
-a numeric vector; \strong{required only in one-sample tests.}
+a numeric vector; \strong{required only in one-sample tests.} Sizes of sequentially observed batches in a group sequential design.
 
-An increasing sequence of values until \code{N.max}. Denotes the sequence of sample sizes where data is observed sequentially.
-
-Last element should equal to \code{N.max}.
-
-\strong{Default:} In case of one-sample binomial proportion test and one-sample Z-test, this is \code{1:N.max}. The same for one-sample T-test is \code{2:N.max}.
+\strong{Required only if the design is group sequential, that is when data are observed in batches. Otherwise, only need to provide \code{N.max}.}
 }
   \item{batch1.seq}{
-a numeric vector; \strong{required only in two-sample tests.}
+a numeric vector; \strong{required only in two-sample tests.} Sizes of sequentially observed batches from Group-1 in a group sequential design.
 
-An increasing sequence of values until \code{N1.max}. Denotes the sequence of sample sizes where data is observed sequentially from Group-1.
-
-Last element should equal to \code{N1.max}.
-
-\strong{Default:} In case of two-sample Z-test, this is \code{1:N1.max}. The same for two-sample T-test is \code{2:N1.max}.
+\strong{Required only if the design is group sequential, that is when data from Group-1 are observed in batches. Otherwise, only need to provide \code{N1.max}.}
 }
   \item{batch2.seq}{
-a numeric vector; \strong{required only in two-sample tests.}
+a numeric vector; \strong{required only in two-sample tests.} Sizes of sequentially observed batches from Group-2 in a group sequential design.
 
-An increasing sequence of values until \code{N2.max}. Denotes the sequence of sample sizes where data is observed sequentially from Group-2.
-
-Last element should equal to \code{N2.max}.
-
-\strong{Default:} In case of two-sample Z-test, this is \code{1:N2.max}. The same for two-sample T-test is \code{2:N2.max}.
+\strong{Required only if the design is group sequential, that is when data from Group-2 are observed in batches. Otherwise, only need to provide \code{N2.max}.}
 }
   \item{type1}{
 a numeric in \code{(0,1)}; the probability at which we want to control the Type 1 error of the MSPRT.
@@ -110,12 +98,18 @@ This is determined at the designing step of a MSPRT using \code{design.MSPRT()}.
 }
   \item{N.max}{
 a positive numeric (integer); \strong{required only in one-sample tests.} Maximum number of samples that we can afford in the one-sample test.
+
+In a group sequential design, this should be equal to \code{sum(batch.seq)}. So in that case, it's enough to provide only \code{batch.seq} and not \code{N.max}.
 }
   \item{N1.max}{
 a positive numeric (integer); \strong{required only in two-sample tests.} Maximum number of samples from Group-1 that we can afford in the two-sample test.
+
+In a group sequential design, this should be equal to \code{sum(batch1.seq)}. So in that case, it's enough to provide only \code{batch1.seq} and not \code{N1.max}.
 }
   \item{N2.max}{
 a positive numeric (integer); \strong{required only in two-sample tests.} Maximum number of samples from Group-2 that we can afford in the two-sample test.
+
+In a group sequential design, this should be equal to \code{sum(batch2.seq)}. So in that case, it's enough to provide only \code{batch2.seq} and not \code{N2.max}.
 }
   \item{plot.it}{
 logical vector; if \code{TRUE} (\strong{Default}), a comparison plot is returned. Otherwise it's not.
@@ -196,11 +190,12 @@ implement.MSPRT(obs = x, test.type = "oneZ", null = 3,
 
 
 ### T-test
+
 x = c(1.738717, 5.076539, 1.116762, 3.105214, 5.567161, 2.095638,
       2.291750, 2.046943, 2.571340, 3.207162, 4.841446, 1.797331)
 
 implement.MSPRT(obs = x, test.type = "oneT", null = 3,
-                term.thresh = 32.702, N.max = 30)
+                term.thresh = 33.152, N.max = 30)
 
 
 
@@ -208,18 +203,29 @@ implement.MSPRT(obs = x, test.type = "oneT", null = 3,
 
 ### Z-test
 
-x = c(4.060319, 5.275465, 3.746557, 7.392921, 5.494262,
-      3.769297, 5.731144, 6.107487, 5.863672)
+x1 = c(0.6546282, 2.2772738, 4.3817680, 0.3044365, 1.8796224,
+      2.1986304, 3.0619321, 1.6404530, 4.9767109)   # group-1
+
+x2 = c(0.5570999, 1.5612114, 2.3881823, 0.2718022, 2.2936742,
+       2.0451859, 2.1281266, 3.6749153, 0.1717139)   # group-2
       
-implement.MSPRT(obs = x, test.type = "twoZ", null = 3,
-                sigma0 = 1.5, term.thresh = , N.max = 30)
+implement.MSPRT(test.type = "twoZ", obs1 = x1, obs2 = x2,
+                sigma0 = 1.5, term.thresh = 27.928,
+                N1.max = 30, N2.max = 30)
 
 
 ### T-test
-x = c(1.738717, 5.076539, 1.116762, 3.105214, 5.567161, 2.095638,
-      2.291750, 2.046943, 2.571340, 3.207162, 4.841446, 1.797331)
 
-implement.MSPRT(obs = x, test.type = "twoT", null = 3,
-                term.thresh = , N.max = 30)
+x1 = c(-0.93968072,  0.27546499, -1.25344292,  2.39292120,  0.49426166,
+       -1.23070258,  0.73114358,  1.10748706,  0.86367203, -0.45808258,
+        2.26767175,  0.58476485, -0.93186087, -3.32204983,  1.68739638,
+        -0.06740041, -0.02428539,  1.41575432,  1.23183179)   # group-1
 
+x2 = c( 0.6546282,  2.2772738,  4.3817680,  0.3044365,  1.8796224,
+        2.1986304,  3.0619321,  1.6404530,  4.9767109,  1.7918195,
+        2.6264761,  3.4726292,  1.4109570,  0.4404965,  4.6733434,
+       -1.4666036,  3.3179069,  2.0537101,  3.5192430)   # group-2
+
+implement.MSPRT(test.type = "twoT", obs1 = x1, obs2 = x2,
+                term.thresh = 32.972, N1.max = 30, N2.max = 30)
 }
