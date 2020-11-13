@@ -2,230 +2,344 @@
 \alias{implement.MSPRT}
 %- Also NEED an '\alias' for EACH other topic documented here.
 \title{
-Implementing a MSPRT
+Implementing the MSPRT
 }
 \description{
-Once we have designed the MSPRT (that is, obtained the termination threshold, \eqn{\gamma}) using \code{design.MSPRT()}, this function implements the MSPRT algorithm for a given data. This is done by sequentially calculating the likelihood ratio(s) or bayes factor(s) (\eqn{L_n}), and then comparing them with the acceptance and rejection thresholds.
-
-This function implements the MSPRT in one-sample proportion tests, and one & two-sample Z & T-tests.
+This function implements the MSPRT for a sequentially observed data.
 }
 \usage{
-implement.MSPRT(test.type, obs, obs1, obs2, side, 
-                batch.seq, batch1.seq, batch2.seq,
-                type1 = 0.005, type2 = 0.2, null, sigma0, term.thresh, 
-                N.max, N1.max, N2.max, plot.it = T, verbose = T)
+implement.MSPRT(obs, obs1, obs2, design.MSPRT.object, 
+                termination.threshold, test.type, side = "right",
+                theta0, Type1.target = 0.005, Type2.target = 0.2,
+                N.max, N1.max, N2.max, 
+                sigma = 1, sigma1 = 1, sigma2 = 1,
+                batch.size, batch1.size, batch2.size,
+                verbose = T, plot.it = 2)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
-  \item{test.type}{
-a character; denotes the type of test.
-
-             ``\code{oneProp}'' for a one-sample binomial proportion test.
-             
-             ``\code{oneZ}'' for a one-sample Z-test.
-             
-             ``\code{oneT}'' for a one-sample T-test.
-             
-             ``\code{twoZ}'' for a two-sample Z-test.
-             
-             ``\code{twoT}'' for a two-sample T-test.
-}
   \item{obs}{
-a numeric vector; \strong{required only in one-sample tests.}
-
-Denotes the sequentially observed data based on which we want to carry out the null hypothesis significance testing (NHST) using a one-sample test.
+  Numeric vector. The vector of data in the order they are sequentially observed for one-sample tests.
+  Note: Its length can't exceed the length of \code{batch.size}.
 }
   \item{obs1}{
-a numeric vector; \strong{required only in two-sample tests.}
-
-Denotes the sequentially observed data from Group-1 based on which we want to carry out the NHST using a two-sample test.
+  Numeric vector. The vector of data in the order they are sequentially observed from Group-1 for two-sample tests.
+  Note: Its length can't exceed the length of \code{batch1.size}.
 }
   \item{obs2}{
-a numeric vector; \strong{required only in two-sample tests.}
-
-Denotes the sequentially observed data from Group-2 based on which we want to carry out the NHST using a two-sample test.
+  Numeric vector. The vector of data in the order they are sequentially observed from Group-2 for two-sample tests.
+  Note: Its length can't exceed the length of \code{batch2.size}.
+}
+  \item{design.MSPRT.object}{
+  List. The output returned from \code{\link{design.MSPRT}} corresponding to the MSPRT for which the operating characteristics are desired.
+}
+  \item{termination.threshold}{
+Positive numeric. Termination threshold of the designed MSPRT.
+}
+  \item{test.type}{
+Same as in \code{\link{design.MSPRT}}. Not required if \code{design.MSPRT.object} is provided.
 }
   \item{side}{
-a character; direction of the alternative hypothesis H1.
-
-Has to be one of \code{"right"} or \code{"left"}.
-
-\strong{Default:} \code{"right"}.
+Same as in \code{\link{design.MSPRT}}. Not required if \code{design.MSPRT.object} is provided.
 }
-  \item{batch.seq}{
-a numeric vector; \strong{required only in one-sample tests.} Sizes of sequentially observed batches in a group sequential design.
-
-\strong{Required only if the design is group sequential, that is when data are observed in batches. Otherwise, only need to provide \code{N.max}.}
+  \item{theta0}{
+Same as in \code{\link{design.MSPRT}}. Not required if \code{design.MSPRT.object} is provided.
 }
-  \item{batch1.seq}{
-a numeric vector; \strong{required only in two-sample tests.} Sizes of sequentially observed batches from Group-1 in a group sequential design.
-
-\strong{Required only if the design is group sequential, that is when data from Group-1 are observed in batches. Otherwise, only need to provide \code{N1.max}.}
+  \item{Type1.target}{
+Same as in \code{\link{design.MSPRT}}. Not required if \code{design.MSPRT.object} is provided.
 }
-  \item{batch2.seq}{
-a numeric vector; \strong{required only in two-sample tests.} Sizes of sequentially observed batches from Group-2 in a group sequential design.
-
-\strong{Required only if the design is group sequential, that is when data from Group-2 are observed in batches. Otherwise, only need to provide \code{N2.max}.}
-}
-  \item{type1}{
-a numeric in \code{(0,1)}; the probability at which we want to control the Type 1 error of the MSPRT.
-
-\strong{Default:} \code{0.005}.
-}
-  \item{type2}{
-a numeric in \code{(0,1)}; the probability at which we want to control the Type 2 error of the MSPRT.
-
-\strong{Default:} \code{0.2}.
-}
-  \item{null}{
-a numeric; \strong{required only in one-sample tests.} the hypothesized value of parameter under the null hypothesis.
-
-The hypothesized parameters are proportion in one-sample proportion tests, population mean in one & two-sample Z & T-tests, and difference between the population mean of Group-2 and Group-1 in two-sample Z & T-tests.
-
-In two-sample tests, only \code{null=0} is allowed. This is done automatically. This argument is \strong{ignored} in these cases.
-
-\strong{Default:} 0.5 in one-sample binomial proportion test, and 0 in one-sample Z and T-tests.
-}
-  \item{sigma0}{
-a positive numeric; \strong{required only in one & two-sample Z-tests.} Known population standard deviation in one-sample tests and known common population standard deviation in two-sample tests.
-
-\strong{Default:} 1.
-}
-  \item{term.thresh}{
-a positive numeric; denotes the termination threshold of a MSPRT.
-
-This is determined at the designing step of a MSPRT using \code{design.MSPRT()}.
+  \item{Type2.target}{
+Same as in \code{\link{design.MSPRT}}. Not required if \code{design.MSPRT.object} is provided.
 }
   \item{N.max}{
-a positive numeric (integer); \strong{required only in one-sample tests.} Maximum number of samples that we can afford in the one-sample test.
-
-In a group sequential design, this should be equal to \code{sum(batch.seq)}. So in that case, it's enough to provide only \code{batch.seq} and not \code{N.max}.
+Same as in \code{\link{design.MSPRT}}. Not required if \code{design.MSPRT.object} is provided.
 }
   \item{N1.max}{
-a positive numeric (integer); \strong{required only in two-sample tests.} Maximum number of samples from Group-1 that we can afford in the two-sample test.
-
-In a group sequential design, this should be equal to \code{sum(batch1.seq)}. So in that case, it's enough to provide only \code{batch1.seq} and not \code{N1.max}.
+Same as in \code{\link{design.MSPRT}}. Not required if \code{design.MSPRT.object} is provided.
 }
   \item{N2.max}{
-a positive numeric (integer); \strong{required only in two-sample tests.} Maximum number of samples from Group-2 that we can afford in the two-sample test.
-
-In a group sequential design, this should be equal to \code{sum(batch2.seq)}. So in that case, it's enough to provide only \code{batch2.seq} and not \code{N2.max}.
+Same as in \code{\link{design.MSPRT}}. Not required if \code{design.MSPRT.object} is provided.
 }
-  \item{plot.it}{
-logical vector; if \code{TRUE} (\strong{Default}), a comparison plot is returned. Otherwise it's not.
+  \item{sigma}{
+Same as in \code{\link{design.MSPRT}}. Not required if \code{design.MSPRT.object} is provided.
+}
+  \item{sigma1}{
+Same as in \code{\link{design.MSPRT}}. Not required if \code{design.MSPRT.object} is provided.
+}
+  \item{sigma2}{
+Same as in \code{\link{design.MSPRT}}. Not required if \code{design.MSPRT.object} is provided.
+}
+  \item{batch.size}{
+Same as in \code{\link{design.MSPRT}}. Not required if \code{design.MSPRT.object} is provided.
+}
+  \item{batch1.size}{
+Same as in \code{\link{design.MSPRT}}. Not required if \code{design.MSPRT.object} is provided.
+}
+  \item{batch2.size}{
+Same as in \code{\link{design.MSPRT}}. Not required if \code{design.MSPRT.object} is provided.
 }
   \item{verbose}{
-a logical; if \code{TRUE}, returns messages of the current proceedings; otherwise it doesn't.
-
-\strong{Default:} \code{TRUE}.
+Logical. If TRUE (\strong{default}), returns messages of the current proceedings. Otherwise it doesn't.
+}
+  \item{plot.it}{
+  0, 1 or 2 (\strong{default}). 
+  \itemize{
+    \item if \code{plot.it=0}, no plot is returned.
+    \item if \code{plot.it=1}, only the ggplot object required to get a comparison plot is returned, but it's not plotted.
+    \item if \code{plot.it=2}, a comparison plot and the corresponding ggplot object is returned.
+  }
 }
 }
-
 \details{
-Suppose we want to carry out one of the above tests. To do that, we simply need to follow two steps:
-
-\strong{Step 1: Designing the MSPRT:} Determine the 'Termination threshold' using \code{design.MSPRT()}.
-
-\strong{Step 2: Implementing the MSPRT:} Implement the MSPRT algorithm for a sequentially observed data using \code{implement.MSPRT()}. In Step 2, we need to use the termination threshold obtained from Step 1.
+If \code{design.MSPRT.object} is provided, one can only additionally provide \code{nReplicate}, \code{nCore}, \code{verbose} and \code{seed} (Easier option). Otherwise, just like in \code{\link{design.MSPRT}}, all the other arguments together with \code{termination.threshold} (obtained from \code{\link{design.MSPRT}}) needs to be provided adequately.
 }
-
 \value{
-Returns a list with the following components:
+List. The list has the following named components in case of one-sided one-sample tests:
 
-\item{decision}{a character; the decision reached based on the provided data.
-
-                Either \code{"reject"} (means `Reject H0') or \code{"accept"} (means `Don't reject H0') or \code{"continue"} (means `continue sampling').}
-\item{n}{a numeric (integer); number of samples required for reaching the \code{decision}.}
-\item{lhood.ratio}{a numeric vector; a vector of likelihood ratios (\eqn{L_n} 's) in favor of the UMPBT alternative.
-
-This is computed at each element of \code{batch.seq} until the available data or the maximum available sample size.}
-\item{rej.threshold}{a numeric; Wald's rejection threshold.}
-\item{acc.threshold}{a numeric; Wald's acceptance threshold.}
-\item{umpbt.alt}{a numeric or numeric vector; denotes the UMPBT alternative(s).
-
-At each stage, likelihood ratios (\eqn{L_n} 's) are computed in favor of this alternative.}
-\item{psi.umpbt}{a numeric; denotes the mixing probability for the UMPBT alternative in one-sample proportion tests.
-
-\strong{Returned only in one-sample proportion tests.}
+  \item{n}{
+  Positive integer. Number of samples required to reach the decision.
+  }
+  
+  \item{decision}{
+  Character. The decision reached. The possibilities are \code{'accept'}, \code{'reject'} and \code{'continue'}. They respectively correspond to accepting \eqn{H_0}, rejecting \eqn{H_0} and continue sampling.
+  }
+  
+  \item{RejectH0.threshold}{
+  Positive numeric. Threshold for rejecting \eqn{H_0} in the MSPRT.
+  }
+  
+  \item{RejectH1.threshold}{
+  Positive numeric. Threshold for accepting \eqn{H_1} in the MSPRT.
+  }
+  
+  \item{LR}{
+  Numeric vector. Vector of weighted likelihood ratios (proportion tests) or likelihood ratios (z tests) or Bayes factor (t tests) that are computed at each step of sequential analysis until either a decision is reached or the maximum available number of samples (\code{N.max} in one-sample tests, or \code{N1.max} and \code{N2.max} in two-sample tests) has been used.
+  }
+  
+  \item{UMPBT alternative}{
+  This stores the UMPBT alternative(s) as
+  \itemize{
+    \item \code{UMPBT} for proportion tests. Of the same type as it is returned by \code{UMPBT.alt} in these tests.
+    \item \code{theta.UMPBT} for z and t tests. This is a numeric in case of z tests and a numeric vector in case of t tests. For t tests the UMPBT alternative depends on the data. So the numeric vector returned in this case contains the UMPBT alternative computed at step of sequential analysis and is based on all data observed until that step.
+    }
+    }
+    
+  In case of two-sample tests, the \code{n} output above is replaced by \code{n1} and \code{n2}. They are positive integers and refer to the number of samples from Group-1 and 2 required to reach the decision.
+  
+  In case of two-sided tests at level of significance \eqn{\alpha}, the MSPRT carries out a right and a left sided test simultaneously at level of significance \eqn{\alpha/2}. In this case the outputs are same as above with following changes in components in the returned list:
+  
+    \item{LR}{
+    List. It has two components named \code{right} and \code{left} corresponding to the right and left sided tests of size \eqn{\alpha/2}. Each of these components stores the vector of weighted likelihood ratios (proportion tests) or likelihood ratios (z tests) or Bayes factor (t tests) that are computed at each step of sequential analysis until either a decision is reached or the maximum available number of samples (\code{N.max} in one-sample tests, or \code{N1.max} and \code{N2.max} in two-sample tests) has been used for that sided test.
+    }
+    
+    \item{UMPBT or theta.UMPBT}{List with two components named \code{right} and \code{left} corresponding to the right and left sided tests of size \eqn{\alpha/2}. Each of these contains the UMPBT alternative (of the same type as the output from \code{UMPBT.alt} for the test with respective sides.
+    }
 }
-}
-
 \references{
-MSPRT: Main article and Supplemental file
-
-Johnson, Valen E., Uniformly most powerful Bayesian tests., Ann. of Stat., 41, (4), 2013, pp. 1716-1741
-
-Johnson, Valen E., Revised standards for statistical evidence., Proceedings of the National Academy of Sciences, 16, 1945.
-
-Daniel J. Benjamin, James O. Berger, Magnus Johannesson, et al. Redefine statistical
-significance. Nature Human Behaviour, 2017.
+Pramanik S., Johnson V. E. and Bhattacharya A. (2020+). A Modified Sequential Probability Ratio Test. \href{https://arxiv.org/pdf/1811.08478.pdf}{[Arxiv]}
 }
-
 \author{
 Sandipan Pramanik, Valen E. Johnson and Anirban Bhattacharya
 }
-
 \examples{
 
-# the termination thresholds are obtained from design.MSPRT()
+#################### one-sample proportion test ####################
 
-## one-sample tests
+#### right sided ####
+### design
+#design.oneprop.right = design.MSPRT(test.type = 'oneProp', side = 'right',
+#                                    N.max = 20)
 
-### proportion test
+### implementation
+#set.seed(1)
+#theta.gen = 0.5  # change effect size to experiment
+#y = rbinom(20, 1, theta.gen)
+#implement.oneprop.right = implement.MSPRT(obs = y, 
+#                                          design.MSPRT.object = design.oneprop.right)
 
-x = c(0, 0, 0, 0, 1, 0, 1, 1, 1, 0, 1, 0, 0, 1, 0,
-      0, 1, 0, 1, 1, 1, 1, 0, 0, 0, 1, 0, 1, 0, 0)
+#### left sided ####
+### design
+#design.oneprop.left = design.MSPRT(test.type = 'oneProp', side = 'left',
+#                                   N.max = 20)
 
-implement.MSPRT(obs = x, test.type = "oneProp", null = 0.2,
-                term.thresh = 22.63, N.max = 30)
+### implementation
+#set.seed(1)
+#theta.gen = 0.5  # change effect size to experiment
+#y = rbinom(20, 1, theta.gen)
+#implement.oneprop.left = implement.MSPRT(obs = y, 
+#                                          design.MSPRT.object = design.oneprop.left)
 
+#### both sided ####
+### design
+#design.oneprop.both = design.MSPRT(test.type = 'oneProp', side = 'both',
+#                                   N.max = 20)
 
-### Z-test
-
-x = c(4.060319, 5.275465, 3.746557, 7.392921, 5.494262,
-      3.769297, 5.731144, 6.107487, 5.863672)
-      
-implement.MSPRT(obs = x, test.type = "oneZ", null = 3,
-                sigma0 = 1.5, term.thresh = 27.856, N.max = 30)
-
-
-### T-test
-
-x = c(1.738717, 5.076539, 1.116762, 3.105214, 5.567161, 2.095638,
-      2.291750, 2.046943, 2.571340, 3.207162, 4.841446, 1.797331)
-
-implement.MSPRT(obs = x, test.type = "oneT", null = 3,
-                term.thresh = 33.152, N.max = 30)
-
-
-
-## two-sample tests
-
-### Z-test
-
-x1 = c(0.6546282, 2.2772738, 4.3817680, 0.3044365, 1.8796224,
-      2.1986304, 3.0619321, 1.6404530, 4.9767109)   # group-1
-
-x2 = c(0.5570999, 1.5612114, 2.3881823, 0.2718022, 2.2936742,
-       2.0451859, 2.1281266, 3.6749153, 0.1717139)   # group-2
-      
-implement.MSPRT(test.type = "twoZ", obs1 = x1, obs2 = x2,
-                sigma0 = 1.5, term.thresh = 27.928,
-                N1.max = 30, N2.max = 30)
+### implementation
+#set.seed(1)
+#theta.gen = 0.5  # change effect size to experiment
+#y = rbinom(20, 1, theta.gen)
+#implement.oneprop.both = implement.MSPRT(obs = y, 
+#                                         design.MSPRT.object = design.oneprop.both)
 
 
-### T-test
+#################### one-sample z test ####################
 
-x1 = c(-0.93968072,  0.27546499, -1.25344292,  2.39292120,  0.49426166,
-       -1.23070258,  0.73114358,  1.10748706,  0.86367203, -0.45808258,
-        2.26767175,  0.58476485, -0.93186087, -3.32204983,  1.68739638,
-        -0.06740041, -0.02428539,  1.41575432,  1.23183179)   # group-1
+#### right sided ####
+### design
+#design.onez.right = design.MSPRT(test.type = 'oneZ', side = 'right',
+#                                 N.max = 20)
 
-x2 = c( 0.6546282,  2.2772738,  4.3817680,  0.3044365,  1.8796224,
-        2.1986304,  3.0619321,  1.6404530,  4.9767109,  1.7918195,
-        2.6264761,  3.4726292,  1.4109570,  0.4404965,  4.6733434,
-       -1.4666036,  3.3179069,  2.0537101,  3.5192430)   # group-2
+### implementation
+#set.seed(1)
+#theta.gen = 0  # change effect size to experiment
+#y = rnorm(20, theta.gen, design.onez.right$sigma)
+#implement.onez.right = implement.MSPRT(obs = y, 
+#                                       design.MSPRT.object = design.onez.right)
 
-implement.MSPRT(test.type = "twoT", obs1 = x1, obs2 = x2,
-                term.thresh = 32.972, N1.max = 30, N2.max = 30)
+#### left sided ####
+### design
+#design.onez.left = design.MSPRT(test.type = 'oneZ', side = 'left',
+#                                N.max = 20)
+
+### implementation
+#set.seed(1)
+#theta.gen = 0  # change effect size to experiment
+#y = rnorm(20, theta.gen, design.onez.left$sigma)
+#implement.onez.left = implement.MSPRT(obs = y, 
+#                                      design.MSPRT.object = design.onez.left)
+
+#### both sided ####
+### design
+#design.onez.both = design.MSPRT(test.type = 'oneZ', side = 'both',
+#                                N.max = 20)
+
+### implementation
+#set.seed(1)
+#theta.gen = 0  # change effect size to experiment
+#y = rnorm(20, theta.gen, design.onez.both$sigma)
+#implement.onez.both = implement.MSPRT(obs = y, 
+#                                      design.MSPRT.object = design.onez.both)
+
+
+#################### one-sample t test ####################
+
+#### right sided ####
+### design
+#design.onet.right = design.MSPRT(test.type = 'oneT', side = 'right',
+#                                 N.max = 20)
+
+### implementation
+#set.seed(1)
+#theta.gen = 0  # change effect size to experiment
+#y = rnorm(20, theta.gen, 1)
+#implement.onet.right = implement.MSPRT(obs = y, 
+#                                       design.MSPRT.object = design.onet.right)
+
+#### left sided ####
+### design
+#design.onet.left = design.MSPRT(test.type = 'oneT', side = 'left',
+#                                N.max = 20)
+
+### implementation
+#set.seed(1)
+#theta.gen = 0  # change effect size to experiment
+#y = rnorm(20, theta.gen, 1)
+#implement.onet.left = implement.MSPRT(obs = y, 
+#                                      design.MSPRT.object = design.onet.left)
+
+#### both sided ####
+### design
+#design.onet.both = design.MSPRT(test.type = 'oneT', side = 'both',
+#                                N.max = 20)
+
+### implementation
+#set.seed(1)
+#theta.gen = 0  # change effect size to experiment
+#y = rnorm(20, theta.gen, 1)
+#implement.onet.both = implement.MSPRT(obs = y, 
+#                                      design.MSPRT.object = design.onet.both)
+
+
+#################### two-sample z test ####################
+
+#### right sided ####
+### design
+#design.twoz.right = design.MSPRT(test.type = 'twoZ', side = 'right',
+#                                 N1.max = 20, N2.max = 20)
+
+### implementation
+#set.seed(1)
+#theta.gen = 0  # change effect size to experiment
+#y1 = rnorm(20, theta.gen/2, design.twoz.right$sigma1)
+#y2 = rnorm(20, -theta.gen/2, design.twoz.right$sigma2)
+#implement.twoz.right = implement.MSPRT(obs1 = y1, obs2 = y2,
+#                                       design.MSPRT.object = design.twoz.right)
+
+#### left sided ####
+### design
+#design.twoz.left = design.MSPRT(test.type = 'twoZ', side = 'left',
+#                                N1.max = 20, N2.max = 20)
+
+### implementation
+#set.seed(1)
+#theta.gen = 0  # change effect size to experiment
+#y1 = rnorm(20, theta.gen/2, design.twoz.left$sigma1)
+#y2 = rnorm(20, -theta.gen/2, design.twoz.left$sigma2)
+#implement.twoz.left = implement.MSPRT(obs1 = y1, obs2 = y2,
+#                                      design.MSPRT.object = design.twoz.left)
+
+#### both sided ####
+### design
+#design.twoz.both = design.MSPRT(test.type = 'twoZ', side = 'both',
+#                                N1.max = 20, N2.max = 20)
+
+### implementation
+#set.seed(1)
+#theta.gen = 0  # change effect size to experiment
+#y1 = rnorm(20, theta.gen/2, design.twoz.both$sigma1)
+#y2 = rnorm(20, -theta.gen/2, design.twoz.both$sigma2)
+#implement.twoz.both = implement.MSPRT(obs1 = y1, obs2 = y2,
+#                                      design.MSPRT.object = design.twoz.both)
+
+
+#################### two-sample t test ####################
+
+#### right sided ####
+### design
+#design.twot.right = design.MSPRT(test.type = 'twoT', side = 'right',
+#                                 N1.max = 20, N2.max = 20)
+
+### implementation
+#set.seed(1)
+#theta.gen = 0  # change effect size to experiment
+#y1 = rnorm(20, theta.gen/2, 1)
+#y2 = rnorm(20, -theta.gen/2, 1)
+#implement.twot.right = implement.MSPRT(obs1 = y1, obs2 = y2,
+#                                       design.MSPRT.object = design.twot.right)
+
+#### left sided ####
+### design
+#design.twot.left = design.MSPRT(test.type = 'twoT', side = 'left',
+#                                N1.max = 20, N2.max = 20)
+
+### implementation
+#set.seed(1)
+#theta.gen = 0  # change effect size to experiment
+#y1 = rnorm(20, theta.gen/2, 1)
+#y2 = rnorm(20, -theta.gen/2, 1)
+#implement.twot.left = implement.MSPRT(obs1 = y1, obs2 = y2,
+#                                      design.MSPRT.object = design.twot.left)
+
+#### both sided ####
+### design
+#design.twot.both = design.MSPRT(test.type = 'twoT', side = 'both',
+#                                N1.max = 20, N2.max = 20)
+
+### implementation
+#set.seed(1)
+#theta.gen = 0  # change effect size to experiment
+#y1 = rnorm(20, theta.gen/2, 1)
+#y2 = rnorm(20, -theta.gen/2, 1)
+#implement.twot.both = implement.MSPRT(obs1 = y1, obs2 = y2,
+#                                      design.MSPRT.object = design.twot.both)
 }

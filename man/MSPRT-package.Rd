@@ -13,8 +13,8 @@
   \tabular{ll}{
     Package: \tab MSPRT\cr
     Type: \tab Package\cr
-    Version: \tab 2.0\cr
-    Date: \tab 02-15-2019\cr
+    Version: \tab 3.0\cr
+    Date: \tab 11-11-2020\cr
     License: \tab GPL>=2\cr
   }
 }
@@ -23,5 +23,3 @@
 
 Maintainer: \packageMaintainer{MSPRT}
 }
-
-\keyword{ package }

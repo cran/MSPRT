@@ -1,53 +1,19 @@
 
+import("ggplot2", "ggpubr", "doParallel", "nleqslv", "foreach")
 
-import(nleqslv)
-import(ggplot2)
-import(foreach)
-import(iterators)
-import(parallel)
-import(doParallel)
-import(datasets)
-import(graphics)
-import(grDevices)
-import(methods)
-import(stats)
-import(utils)
+export("design.MSPRT", "design.MSPRT_oneProp", "design.MSPRT_oneT",
+       "design.MSPRT_oneZ", "design.MSPRT_twoT", "design.MSPRT_twoZ",
+       "effectiveN.oneProp", "fixed_design.alt", "implement.MSPRT",
+       "implement.MSPRT_oneProp", "implement.MSPRT_oneT",
+       "implement.MSPRT_oneZ", "implement.MSPRT_twoT",
+       "implement.MSPRT_twoZ", "Nstar", "OCandASN.MSPRT",
+       "OCandASN.MSPRT_oneProp", "OCandASN.MSPRT_oneT",
+       "OCandASN.MSPRT_oneZ", "OCandASN.MSPRT_twoT",
+       "OCandASN.MSPRT_twoZ", "Type2.fixed_design", "UMPBT.alt")
 
-export(check,
-       compmerge.list,
-       design.MSPRT,
-       effective.N,
-       error.summary,
-       find.alt,
-       find.samplesize,
-       find.threshold.oneProp,
-       implement.MSPRT,
-       LR.oneProp,
-       LR.oneT,
-       LR.oneZ,
-       LR.twoT,
-       LR.twoZ,
-       objfunc.oneProp,
-       OC.MSPRT,
-       overshoot.oneProp,
-       overshoot.oneT,
-       overshoot.oneZ,
-       overshoot.twoT,
-       overshoot.twoZ,
-       ovr.repl.oneProp,
-       ovr.repl.oneT,
-       ovr.repl.oneZ,
-       ovr.repl.twoT,
-       ovr.repl.twoZ,
-       point.umpbt.oneProp,
-       type2.error.oneProp,
-       type2.error.oneT,
-       type2.error.oneZ,
-       type2.error.twoT,
-       type2.error.twoZ,
-       ump.match.oneProp,
-       umpbt.oneProp,
-       umpbt.oneT,
-       umpbt.oneZ,
-       umpbt.twoT,
-       umpbt.twoZ)
+importFrom("stats", "dbinom", "optimize", "pbinom", "pnorm", "pt",
+           "qbinom", "qnorm", "qt", "rbinom", "rnorm", "sd", "sigma",
+           "uniroot", "var")
+importFrom("utils", "setTxtProgressBar", "txtProgressBar")
+importFrom("foreach", "foreach", "%dopar%")
+importFrom("parallel", "detectCores")

@@ -2,262 +2,320 @@
 \alias{design.MSPRT}
 %- Also NEED an '\alias' for EACH other topic documented here.
 \title{
-Designing a MSPRT
+Designing the MSPRT
 }
 \description{
-Given the desired values of Type 1 & Type 2 error probabilities and the maximum available number of samples (N), this function designs the MSPRT (by finding the 'Termination Threshold' \eqn{\gamma}). \eqn{\gamma} is the smallest possible value so that the Type 1 error of the MSPRT is maintained at the desired level. This function designs the MSPRT for one-sample proportion tests, one-sample Z and T-tests, and two-sample Z and T-tests.
-
-By default (that is, if \code{alt.comp} is missing or \code{FALSE}) this provides the operating characteristics (OC) for the obtained MSPRT at the null hypothesized value. Otherwise, this also finds the OC at a user desired point alternative. This point alternative is specified through \code{alt.comp}.
-
-In general, \code{OC.MSPRT()} can also be used to find the OC of the MSPRT at any desired parameter value.
+Given the maximum available sample size and prespecified Type I & II error probabilities, this function designs/obtains the corresponding MSPRT.
 }
 \usage{
-design.MSPRT(test.type, side, batch.seq, batch1.seq, batch2.seq, 
-             type1 = 0.005, type2 = 0.2, null, sigma0 = 1, 
-             N.max, N1.max, N2.max, alt.comp, repl, 
-             verbose = T, core.no)
+design.MSPRT(test.type, side = "right", theta0, theta1 = T, 
+             Type1.target = 0.005, Type2.target = 0.2, 
+             N.max, N1.max, N2.max, 
+             sigma = 1, sigma1 = 1, sigma2 = 1, 
+             batch.size, batch1.size, batch2.size, 
+             nReplicate = 1e+06, verbose = T, seed = 1)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
   \item{test.type}{
-a character; denotes the type of test.
+Character. Type of test. Currently, the package only allows 
 
-             ``\code{oneProp}'' for a one-sample binomial proportion test.
-             
-             ``\code{oneZ}'' for a one-sample Z-test.
-             
-             ``\code{oneT}'' for a one-sample T-test.
-             
-             ``\code{twoZ}'' for a two-sample Z-test.
-             
-             ``\code{twoT}'' for a two-sample T-test.
+  \itemize{
+  
+    \item \code{oneProp} for one-sample proportion tests
+    \item \code{oneZ} for one-sample z tests
+    \item \code{oneT} for one-sample t tests
+    \item \code{twoZ} for two-sample z tests
+    \item \code{twoT} for two-sample t tests.
+  }
 }
   \item{side}{
-a character; direction of the alternative hypothesis H1.
-
-Has to be one of \code{"right"} or \code{"left"}.
-
-\strong{Default:} \code{"right"}.
+Character. Direction of the composite alternative hypothesis. \code{right} for \eqn{H_1 : \theta > \theta_0} (\strong{default}), and \code{left} for \eqn{H_1 : \theta < \theta_0}.
 }
-  \item{batch.seq}{
-a numeric vector; \strong{required only in one-sample tests.} Sizes of sequentially observed batches in a group sequential design.
+  \item{theta0}{
+Numeric. Hypothesized value of effect size (\eqn{\theta_0}) under \eqn{H_0}. 
 
-\strong{Required only if the design is group sequential, that is when data are observed in batches. Otherwise, only need to provide \code{N.max}.}
+\strong{Default:} 0.5 in one-sample proportion tests, and 0 for others.
 }
-  \item{batch1.seq}{
-a numeric vector; \strong{required only in two-sample tests.} Sizes of sequentially observed batches from Group-1 in a group sequential design.
+  \item{theta1}{
+Logical, numeric or list (two components with names \code{'right'} and \code{'left'}).
+  
+  \itemize{
+    \item If \code{FALSE}, no comparison is done under the alternative hypothesis.
+    \item If \code{TRUE} (\strong{Default}), comparison is done at the fixed-design alternative effect size (\eqn{\theta_a}).
+    \item If numeric, this can only be in case of one-sided tests (that is, \code{side = "right"} or \code{"left"}). The comparison is done at the specified numeric value of the alternative effect size.
+    \item If list, this can only be in case of two-sided tests (that is, \code{side = "both"}). The list has to be of the form \code{list("right" =} \eqn{\theta_1}\code{, "left" =} \eqn{\theta_2}). Then the comparison is done at alternative effect sizes \eqn{\theta_1} and \eqn{\theta_2}.
+  }
 
-\strong{Required only if the design is group sequential, that is when data from Group-1 are observed in batches. Otherwise, only need to provide \code{N1.max}.}
+Note: In case of two-sided tests at a given level of significance, there are two effect sizes under \eqn{H_1} (one on the right of \eqn{H_0} and one on the left) that corresponds to the same Type II error probability (or power). This list provides users with the ability where he/she can replace \eqn{\theta_1} and \eqn{\theta_2} by any effect sizes from each side in the form of a list as mentioned above, and can get the designed MSPRT together with its operating characteristics at those effect sizes.
 }
-  \item{batch2.seq}{
-a numeric vector; \strong{required only in two-sample tests.} Sizes of sequentially observed batches from Group-2 in a group sequential design.
+  \item{Type1.target}{
+Numeric within [0,1]. Prespecified level of Type I error probability.
 
-\strong{Required only if the design is group sequential, that is when data from Group-2 are observed in batches. Otherwise, only need to provide \code{N2.max}.}
+\strong{Default:} 0.005.
+
+The MSPRT exactly maintains its Type I error probability at this value.
 }
-  \item{type1}{
-a numeric in \code{(0,1)}; the probability at which we want to control the Type 1 error of the MSPRT.
+  \item{Type2.target}{
+Numeric within [0,1]. Prespecified level of Type 2 error probability.
 
-\strong{Default:} \code{0.005}.
+\strong{Default:} 0.2.
+
+The MSPRT approximately maintains its Type II error probability at this value at the corresponding fixed-design alternative (\eqn{\theta_a}).
 }
-  \item{type2}{
-a numeric in \code{(0,1)}; the probability at which we want to control the Type 2 error of the MSPRT.
-
-\strong{Default:} \code{0.2}.
+  \item{N.max}{
+Positive integer. Maximum available sample size in one-sample tests.
 }
-  \item{null}{
-a numeric; \strong{required only in one-sample proportion and Z-tests.} Denotes value of the  hypothesized parameter under the null hypothesis.
-
-The hypothesized parameters are proportion in one-sample binomial proportion test, population mean in one-sample Z & T-tests, and difference between the population means of Group-2 and Group-1 in two-sample Z & T-tests.
-
-In one-sample T-tests and two-sample tests, only \code{null=0} is allowed. This is done automatically. This argument is \strong{ignored} in these cases.
-
-\strong{Default:} 0.5 in one-sample binomial proportion test, and 0 in one-sample Z-tests.
+  \item{N1.max}{
+Positive integer. Maximum available sample size from Group-1 in two-sample tests.
 }
-  \item{sigma0}{
-a positive numeric; \strong{required only in one & two-sample Z-tests.} Known population standard deviation in one-sample tests and known common population standard deviation in two-sample tests.
+  \item{N2.max}{
+Positive integer. Maximum available sample size from Group-2 in two-sample tests.
+}
+  \item{sigma}{
+Positive numeric. Known standard deviation in one-sample z tests. 
 
 \strong{Default:} 1.
 }
-  \item{N.max}{
-a positive numeric (integer); \strong{required only in one-sample tests.} Maximum number of samples that we can afford in the one-sample test.
+  \item{sigma1}{
+Positive numeric. Known standard deviation for Group-1 in two-sample z tests. 
 
-In a group sequential design, this should be equal to \code{sum(batch.seq)}. So in that case, it's enough to provide only \code{batch.seq} and not \code{N.max}.
+\strong{Default:} 1.
 }
-  \item{N1.max}{
-a positive numeric (integer); \strong{required only in two-sample tests.} Maximum number of samples from Group-1 that we can afford in the two-sample test.
+  \item{sigma2}{
+Positive numeric. Known standard deviation for Group-2 in two-sample z tests. 
 
-In a group sequential design, this should be equal to \code{sum(batch1.seq)}. So in that case, it's enough to provide only \code{batch1.seq} and not \code{N1.max}.
+\strong{Default:} 1.
 }
-  \item{N2.max}{
-a positive numeric (integer); \strong{required only in two-sample tests.} Maximum number of samples from Group-2 that we can afford in the two-sample test.
+  \item{batch.size}{
+Integer vector. A vector denoting the number of observations that are planned to be observed at each sequential step in one-sample tests. 
+  
+\strong{Default:}
+  \itemize{
+    \item Proportion and z tests: \code{rep(1, N.max)}.
+    \item t tests: \code{c(2, rep(1, N.max-1))}.
+  }
+      
+Default values mean the sequential analysis is performed after observing each observation. This corresponds to a sequential MSPRT. If any batch size is more than 1 (or more than 2 in the 1st step for t test) it corresponds to a group sequential MSPRT.
 
-In a group sequential design, this should be equal to \code{sum(batch2.seq)}. So in that case, it's enough to provide only \code{batch2.seq} and not \code{N2.max}.
+Note: First batch size for t tests needs to be at least 2. The length of batch.size equals to the maximum number of planned sequential analyses.
 }
-  \item{alt.comp}{
-missing, \code{FALSE} or \code{TRUE}, or a numeric;
+  \item{batch1.size}{
+Integer vector. A vector denoting the number of observations that are planned to be observed from Group-1 at each sequential step in two-sample tests. 
 
-If missing or \code{FALSE}, the OC of the MSPRT are obtained only at the \code{null};
-
-If \code{TRUE}, the OC of the MSPRT are computed at the \code{null} and the 'fixed design alternative';
-
-If a numeric, it can be any value under the alternative (consistent with the \code{"side"}). Then OC of the MSPRT are obtained at the \code{null} and this point.
+\strong{Default:}
+  \itemize{
+    \item z tests: \code{rep(1, N1.max)}.
+    \item t tests: \code{c(2, rep(1, N1.max-1))}.
+  }
+    
+Default values mean the sequential analysis is performed after observing each observation from Group-1.
 }
-  \item{repl}{
-a positve numeric (integer); total number of replications to be used in Monte Carlo method to calculate the OC of the MSPRT.
+  \item{batch2.size}{
+Integer vector. A vector denoting the number of observations that are planned to be observed from Group-2 at each sequential step in two-sample tests. 
 
-\strong{Default (Recommended):} \code{2e+6} in a one-sample proportion test; \code{1e+6} otherwise. Should be at least \code{1e+5}.
+\strong{Default:}
+  \itemize{
+    \item z tests: \code{rep(1, N2.max)}.
+    \item t tests: \code{c(2, rep(1, N2.max-1))}.
+  }
+    
+Default values mean the sequential analysis is performed after observing each observation from Group-2.
+}
+  \item{nReplicate}{
+Positive integer. Total number of replications to be used in Monte Carlo simulation for calculating the termination threshold and the operating characteristics of the MSPRT. 
+
+\strong{Default:} 1,000,000.
 }
   \item{verbose}{
-a logical; if \code{TRUE}, returns messages of the current proceedings; otherwise it doesn't.
-
-\strong{Default:} \code{TRUE}.
+Logical. If \code{TRUE} (\strong{default}), returns messages of the current proceedings. Otherwise it doesn't.
 }
-  \item{core.no}{
-a numeric; number of cores this function can use for carrying out a parallel computation.
+  \item{seed}{
+Integer. Random number generating seed. 
 
-\strong{Default:} \code{1} if there are at most 2 cores, otherwise \code{(number of cores -1)}.
+\strong{Default:} 1.
 }
-}
-\details{
-In two-sample tests, the hypothesized parameter is (population mean of Group-2 - population mean of Group-1). So \code{null=0} implies that these two means are equal under the null hypothesis; \code{side="right"} implies that the population mean of Group-2 is larger under this alternative hypothesis; \code{side="left"} implies that the population mean of Group-1 is larger under this alternative hypothesis.
-
-For a user guide, please refer to the supplemental information.
 }
 \value{
-Let us first look at the outputs in one-sample tests.
+List. The list has the following named components in case of one-sided one-sample tests:
 
-If \code{alt.comp} is missing or \code{FALSE} (default), this computes the OC of the obtained MSPRT under the null hypothesis, and returns a list with the following components:
-  \item{type1.est}{a numeric in \code{(0,1)}; the Type 1 error probability of the MSPRT.}
-  \item{avg.n0}{a positive numeric; the number of samples required on an average by the MSPRT for coming to a decision when the null hypothesis is true.}
-  \item{umpbt.alt}{a numeric or a numeric vector of length 2;
-  
-  In one-sample proportion tests, this is usually of length 2. They specify the two points of the UMPBT alternative.
-  
-  In one & two-sample Z-tests, this is the UMPBT point alternative.
-  
-  In one & two-sample T-tests, this is not returned.
-  
-}
-  
-  \item{psi.umpbt}{a numeric in \code{(0,1)}; \strong{returned only in case of one-sample proportion tests.} This denotes the probability of the first component in \code{umpbt.alt}.}
-                  
-  \item{rej.threshold}{a numeric; the constant value of Wald's rejection threshold.}
-  \item{acc.threshold}{a numeric; the constant value of Wald's acceptance threshold.}
-  \item{term.thresh}{a positive numeric; denotes the Termination Threshold (\eqn{\gamma}) of a MSPRT.
+  \item{TypeI.attained}{
+  Numeric in [0,1]. Type I error probability attained by the designed MSPRT.
   }
   
+  \item{Type2.attained}{
+  Numeric in [0,1]. Type II error probability attained by the designed MSPRT at the specified alternative effect size \code{theta1}. Returned only if \code{theta1} is \code{TRUE} or numeric.
+  }
   
-If \code{alt.comp} equals \code{TRUE}, this additionally computes the OC of the obtained MSPRT at the 'fixed design alternative'. In this case, the function returns a list with the following components in addition to the previously mentioned components:
-
-  \item{type2.est}{a numeric in \code{(0,1)}; the Type 2 error probability of the obtained MSPRT at the alternative.}
-  \item{avg.n1}{a positive numeric; the number of samples required on an average by the MSPRT for coming to a decision when the alternative is true.}
-  \item{alt}{a numeric; the point alternative where the performance is computed.
+  \item{N}{
+  List.
   
-            In this case, this is the 'fixed design alternative'.}
-  \item{alt.type2}{a numeric in \code{(0,1)}; the Type 2 error probability of the fixed design test at \code{alt}.
-                   
-                   In this case this is exactly \code{type2}.}
+  \itemize{
+    \item If \code{theta1 = FALSE}, the list has one component named \code{H0}. It stores an integer vector of length \code{nReplicate}. This is the vector of sample size required by the MSPRT for each of \code{nReplicate} Monte Carlo simulations under \eqn{H_0}.
+    
+    \item If \code{theta1} is \code{TRUE} or numeric, the list has two components named \code{H0} and \code{H1}. Each of these stores an integer vector of length \code{nReplicate}. The stored vector under \code{H0} is the same as in \code{theta1 = FALSE}. The \code{H1} component stored the vector of sample size required by the MSPRT for each of \code{nReplicate} Monte Carlo simulations under the specified alternative effect size.
+  }
+  }
+      
+  \item{EN}{
+  Numeric vector.
+  
+  \itemize{
+    \item If \code{theta1 = FALSE}, the vector is of length 1. It is the number of samples required on average by the MSPRT under \eqn{H_0}.
+    
+    \item If \code{theta1} is \code{TRUE} or numeric, the vector is of length 2. They are the number of samples required on average by the MSPRT under \eqn{H_0} (first component) and the specified alternative effect size (second component), respectively.
+  }
+  }
+      
+  \item{UMPBT or theta.UMPBT}{
+  The UMPBT alternative. \code{UMPBT} in case of one-sample proportion test and \code{theta.UMPBT} in case of all the other tests. Their types are the same as their output from \code{UMPBT.alt} function.
+  
+  Note: Not returned in t tests as it depends on the data.
+  }
+  
+  \item{theta1}{
+  Returned only if \code{theta1} is anything but \code{FALSE}. Stores the effect size under \eqn{H_1} where the operating characteristic of the MSPRT is obtained. Of the same type as the argument \code{theta1}.
+  }
+  
+  \item{Type2.fixed.design}{
+  Numeric in [0,1]. Type II error probability attained by the fixed design test with sample size \code{N.max} and Type I error probability \code{Type1.target} at the alternative effect size \code{theta1}.
+  }
+  
+  \item{RejectH0.threshold}{
+  Positive numeric. Threshold for rejecting \eqn{H_0} in the MSPRT.
+  }
+  
+  \item{RejectH1.threshold}{
+  Positive numeric. Threshold for accepting \eqn{H_1} in the MSPRT.
+  }
+  
+  \item{termination.threshold}{
+  Positive numeric. Termination threshold of the MSPRT.
+  }
+  
+  In case of one-sided two-sample tests the above components are returned with following modifications:
 
+  \item{N:}{List.
+  
+    \itemize{
+      \item If \code{theta1 = FALSE} the list has one component named \code{H0}.
+      
+      \item \code{theta1} is \code{TRUE} or numeric, the list has two components named \code{H0} and \code{H1}.
+    
+      Each of the named components \code{H0} and \code{H1} contains a list with two components named \code{Group1} and \code{Group2}. Each of these contains the same vector corresponding to Group-1 and Group-2. In each of these, it contains the sample size required by the MSPRT in each of \code{nReplicate} Monte Carlo simulations under the respective effect size for the respective group.
+    }
+  }
+  
+  \item{EN}{List.
+  
+    \itemize{
+    \item If \code{theta1 = FALSE} the list has one component named \code{H0}.
+    
+    \item If \code{theta1} is \code{TRUE} or numeric, the list has two components named \code{H0} and \code{H1}.
+    }
+    
+    Each of the named components \code{H0} or \code{H1} contains a list with two components named \code{Group1} and \code{Group2}. In each of these, it contains the sample size required on average by the MSPRT under the respective effect size for the respective group.
+    }
+  
+In case of two-sided tests the above components are returned with following modifications:
 
-If \code{alt.comp} is numeric, then this computes the list exactly it was for \code{alt.comp = TRUE} with \code{type2.est}, \code{avg.n1}, \code{alt} and \code{alt.type2} now computed at this user specified value.
-
-
-In two-sample tests we get similar outputs as in one-sample tests above, except \code{avg.n0} and \code{avg.n1} is replaced by \code{avg.n1_0}, \code{avg.n2_0} and \code{avg.n1_1}, \code{avg.n2_1}, respectively.
-
-\item{avg.n1_0}{a positive numeric; the number of samples from Group-1 required on an average by the MSPRT for coming to a decision when the null hypothesis is true.}
-
-\item{avg.n2_0}{a positive numeric; the number of samples from Group-2 required on an average by the MSPRT for coming to a decision when the null hypothesis is true.}
-
-\item{avg.n1_1}{a positive numeric; the number of samples from Group-1 required on an average by the MSPRT for coming to a decision when the alternative hypothesis is true.}
-
-\item{avg.n2_1}{a positive numeric; the number of samples from Group-2 required on an average by the MSPRT for coming to a decision when the alternative hypothesis is true.}
-
+    \item{Type2.attained}{
+    Numeric vector of length 2 with both elements in [0,1]. The first and second component is the Type II error probability of the MSPRT at the specified alternative effect sizes \code{theta1$right} and \code{theta1$left}, respectively.
+    }
+  
+    \item{N}{
+    This is the same as in one-sided tests if \code{theta1} is \code{FALSE}. If \code{theta1} is \code{TRUE} or a two-component list with names \code{right} and \code{left}, this is a list with three components with names \code{H0}, \code{right} and \code{left} instead of a two-component list with names \code{H0} and \code{H1}. Quantities stored under these components are the same as in one-sided tests except the quantities under \code{right} and \code{left} are the same performance of the designed MSPRT at the specified alternative effect sizes \code{theta1$right} and \code{theta1$left}, respectively.
+    }
+  
+    \item{EN}{
+    Numeric vector. The same as in one-sided tests if \code{theta1} is \code{FALSE}. If \code{theta1} is \code{TRUE} or a two-component list with names \code{right} and \code{left}, this is a numeric vector of length 3, where the first, second and third components are the average required sample size under \eqn{H_0}, and at the specified alternative effect sizes \code{theta1$right} and \code{theta1$left}, respectively.
+    }
+  
+Additionally, the output list also contains the provided arguments of design.MSPRT, and 
+  
+    \item{nAnalyses}{
+    Positive integer. This is the maximum number of sequential analyses that is planned. This equals to the \code{length(batch.size)} in one-sample tests, and to the \code{length(batch1.size)} and \code{length(batch2.size)} in two-sample tests.
+    }
 }
-
 \references{
-MSPRT: Main article and Supplemental file
-
-Johnson, Valen E., Uniformly most powerful Bayesian tests., Ann. of Stat., 41, (4), 2013, pp. 1716-1741
-
-Johnson, Valen E., Revised standards for statistical evidence., Proceedings of the National Academy of Sciences, 16, 1945.
-
-Daniel J. Benjamin, James O. Berger, Magnus Johannesson, et al. Redefine statistical
-significance. Nature Human Behaviour, 2017.
+Pramanik S., Johnson V. E. and Bhattacharya A. (2020+). A Modified Sequential Probability Ratio Test. \href{https://arxiv.org/pdf/1811.08478.pdf}{[Arxiv]}
 }
 \author{
 Sandipan Pramanik, Valen E. Johnson and Anirban Bhattacharya
 }
-
 \examples{
 
-## right-sided one-sample proportion test
+##### one-sample proportion test #####
 
-# can observe data after each sample sequentially. Max available
-# sample size is 30
-# design.MSPRT(test.type="oneProp", null = 0.2, N.max = 30)
+## right-sided
+#design.MSPRT(test.type = 'oneProp', side = 'right',
+#             N.max = 20)
 
+## left-sided
+#design.MSPRT(test.type = 'oneProp', side = 'right',
+#             N.max = 20)
 
-# can observe data at every fifth sample sequentially. Max available
-# sample size is 30. So there are 6 batches each of size 5.
-# design.MSPRT(test.type="oneProp", null = 0.2, N.max = 30,
-#              batch.seq = rep(5,6))
-               
-
-               
-## right-sided one-sample Z-test
-
-# can observe data after each sample sequentially. Max available
-# sample size is 30
-# design.MSPRT(test.type="oneZ", null = 3, sigma0 = 1.5,
-#              N.max = 30)
+## two-sided
+#design.MSPRT(test.type = 'oneProp', side = 'both',
+#             N.max = 20)
 
 
-# can observe data at every fifth sample sequentially. Max available
-# sample size is 30. So there are 6 batches each of size 5.
-# design.MSPRT(test.type="oneZ", null = 3, sigma0 = 1.5,
-#              N.max = 30, batch.seq = rep(5,6))
-               
+##### one-sample z test #####
+
+## right-sided
+#design.MSPRT(test.type = 'oneZ', side = 'right',
+#             N.max = 20)
+
+## left-sided
+#design.MSPRT(test.type = 'oneZ', side = 'right',
+#             N.max = 20)
+
+## two-sided
+#design.MSPRT(test.type = 'oneZ', side = 'both',
+#              N.max = 20)
 
 
-## right-sided one-sample T-test
+##### one-sample t test #####
 
-# can observe data after each sample sequentially. Max available
-# sample size is 30
-# design.MSPRT(test.type="oneT", N.max = 30)
+## right-sided
+#design.MSPRT(test.type = 'oneT', side = 'right',
+#             N.max = 20)
 
+## left-sided
+#design.MSPRT(test.type = 'oneT', side = 'right',
+#             N.max = 20)
 
-# can observe data at every fifth sample sequentially. Max available
-# sample size is 30. So there are 6 batches each of size 5.
-# design.MSPRT(test.type="oneT", N.max = 30, batch.seq = rep(5,6))
-
-
-               
-## right-sided two-sample Z-test
-
-# can observe data after each sample for each group sequentially.
-# Max available sample size is 30 for both groups
-# design.MSPRT(test.type="twoZ", sigma0 = 1.5, N1.max = 30, N2.max = 30)
+## two-sided
+#design.MSPRT(test.type = 'oneT', side = 'both',
+#             N.max = 20)
 
 
-# can observe data at every fifth sample for each group sequentially.
-# Max available sample size is 30 for both groups. So there are 6 batches
-# each of size 5 for each group.
-# design.MSPRT(test.type="twoZ", sigma0 = 1.5,
-#              batch1.seq = rep(5,6), batch2.seq = rep(5,6),
-#              N1.max = 30, N2.max = 30)
-               
+##### two-sample z test #####
 
-               
-## right-sided two-sample T-test
+## right-sided
+#design.MSPRT(test.type = 'twoZ', side = 'right',
+#             N1.max = 20, N2.max = 20)
 
-# can observe data after each sample for each group sequentially.
-# Max available sample size is 30 for both groups
-# design.MSPRT(test.type="twoT", N1.max = 30, N2.max = 30)
+## left-sided
+#design.MSPRT(test.type = 'twoZ', side = 'left',
+#             N1.max = 20, N2.max = 20)
+
+## two-sided
+#design.MSPRT(test.type = 'twoZ', side = 'both',
+#             N1.max = 20, N2.max = 20)
 
 
-# can observe data at every fifth sample for each group sequentially.
-# Max available sample size is 30 for both groups. So there are 6 batches
-# each of size 5 for each group.
-# design.MSPRT(test.type="twoT", N1.max = 30, N2.max = 30,
-#              batch1.seq = rep(5,6), batch2.seq = rep(5,6))
+##### two-sample t test #####
+
+## right-sided
+#design.MSPRT(test.type = 'twoT', side = 'right',
+#             N1.max = 20, N2.max = 20)
+
+## left-sided
+#design.MSPRT(test.type = 'twoT', side = 'left',
+#             N1.max = 20, N2.max = 20)
+
+## two-sided
+#design.MSPRT(test.type = 'twoT', side = 'both',
+#             N1.max = 20, N2.max = 20)
 }
